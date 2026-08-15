@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { getApplicationName } from "@/server/deployment";
 import "./globals.css";
 
 const inter = localFont({
@@ -13,10 +14,8 @@ const inter = localFont({
   variable: "--font-inter",
 });
 
-const isProduction = process.env.VERCEL_ENV === "production";
-
 export const metadata: Metadata = {
-  title: isProduction ? "JASTIPin CMS" : "JASTIPin CMS Staging",
+  title: getApplicationName(),
   description: "Sistem informasi operasional internal JASTIPin",
 };
 

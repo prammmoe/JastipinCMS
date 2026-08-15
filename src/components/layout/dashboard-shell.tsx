@@ -107,7 +107,13 @@ function initials(name?: string) {
     .toUpperCase();
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  applicationName,
+  children,
+}: {
+  applicationName: string;
+  children: React.ReactNode;
+}) {
   const path = usePathname();
   const [user, setUser] = useState<Actor | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -132,7 +138,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <PackageCheck size={19} strokeWidth={1.8} />
           </span>
           <div>
-            <div className="brand-name">JASTIPin CMS</div>
+            <div className="brand-name">{applicationName}</div>
           </div>
           {mobileOpen && (
             <button

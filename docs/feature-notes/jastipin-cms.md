@@ -185,3 +185,12 @@ Branch: `main`
 
 ### Verification
 - Every Vercel CLI command that accesses project state now selects the same team scope as the successful API preflight.
+
+## 2026-08-15 - Show deployment name in visible application branding
+
+### Bugs And Fixes
+- Bug: Staging and production both use `NODE_ENV=production` during optimized Next.js builds, and the visible login/sidebar brand remained hardcoded regardless of metadata.
+  Fix: Resolve the deployment from server-only Vercel environment values and pass the resulting application name into both client-side brand surfaces.
+
+### Verification
+- Production resolves to `JASTIPin CMS`; Preview and local environments resolve to `JASTIPin CMS Staging` for metadata, login, and dashboard navigation.
