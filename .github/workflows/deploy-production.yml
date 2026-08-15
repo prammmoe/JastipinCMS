@@ -44,8 +44,19 @@ jobs:
         run: supabase db push --dry-run --linked --password "$SUPABASE_DB_PASSWORD"
       - name: Apply production migrations
         run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
+      - name: Verify Vercel project access
+        run: |
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --header "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID?teamId=$VERCEL_ORG_ID")"
+          if [ "$status" != "200" ]; then
+            echo "Vercel project access failed with HTTP $status. Check VERCEL_TOKEN scope, VERCEL_ORG_ID, and VERCEL_PROJECT_ID."
+            exit 1
+          fi
+      - name: Link production Vercel project
+        run: pnpm dlx vercel@59.1.3 link --yes --team="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
       - name: Pull production project settings
-        run: pnpm dlx vercel@59.1.3 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 pull --yes --environment=production --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
       - name: Build production
         run: pnpm dlx vercel@59.1.3 build --prod --token="$VERCEL_TOKEN"
       - name: Deploy production

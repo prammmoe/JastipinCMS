@@ -158,3 +158,12 @@ Branch: `main`
 
 ### Verification
 - Both workflow files parse as valid YAML and no unpinned or global Vercel CLI invocation remains.
+
+## 2026-08-15 - Make Vercel project linking explicit in CI
+
+### Bugs And Fixes
+- Bug: Vercel CLI ran successfully in GitHub Actions but could not auto-resolve the project settings from environment IDs.
+  Fix: Added a non-secret API access preflight and an explicit `vercel link` using the configured Team ID and Project ID before pulling environment settings.
+
+### Verification
+- Staging and production workflows validate Vercel access without printing tokens and provide actionable HTTP status errors for invalid token scope or resource IDs.
