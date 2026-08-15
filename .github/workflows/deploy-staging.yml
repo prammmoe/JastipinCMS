@@ -24,6 +24,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_SCOPE: prammmoes-projects
       STAGING_ALIAS: jastipin-cms-staging.vercel.app
     steps:
       - uses: actions/checkout@v4
@@ -63,15 +64,15 @@ jobs:
             '{orgId: $orgId, projectId: $projectId}' \
             > .vercel/project.json
       - name: Pull staging project settings
-        run: pnpm dlx vercel@59.1.3 pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 pull --yes --environment=preview --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Build staging
-        run: pnpm dlx vercel@59.1.3 build --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 build --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Deploy and assign stable staging URL
         run: |
-          deployment_json="$(pnpm dlx vercel@59.1.3 deploy --prebuilt --json --token="$VERCEL_TOKEN")"
+          deployment_json="$(pnpm dlx vercel@59.1.3 deploy --prebuilt --json --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN")"
           deployment_url="$(printf '%s' "$deployment_json" | jq -r '.url // .deployment.url')"
           test -n "$deployment_url"
-          pnpm dlx vercel@59.1.3 alias set "$deployment_url" "$STAGING_ALIAS" --token="$VERCEL_TOKEN"
+          pnpm dlx vercel@59.1.3 alias set "$deployment_url" "$STAGING_ALIAS" --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Smoke test
         run: |
           login_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 5 --retry-delay 3 "https://$STAGING_ALIAS/login")"

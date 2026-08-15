@@ -176,3 +176,12 @@ Branch: `main`
 
 ### Verification
 - Neither workflow invokes `vercel link` or the deprecated `--team` option, while both retain the token/project access preflight.
+
+## 2026-08-15 - Scope Vercel CLI commands to the project team
+
+### Bugs And Fixes
+- Bug: Vercel's generic `Could not retrieve Project Settings` message hid a team-permission failure because CLI project requests used the default personal scope, while the API preflight explicitly supplied the Team ID.
+  Fix: Added the non-secret `prammmoes-projects` team slug as `VERCEL_SCOPE` and passed `--scope` to pull, build, deploy, and alias commands.
+
+### Verification
+- Every Vercel CLI command that accesses project state now selects the same team scope as the successful API preflight.

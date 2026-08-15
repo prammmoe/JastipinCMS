@@ -24,6 +24,7 @@ jobs:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_SCOPE: prammmoes-projects
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -62,11 +63,11 @@ jobs:
             '{orgId: $orgId, projectId: $projectId}' \
             > .vercel/project.json
       - name: Pull production project settings
-        run: pnpm dlx vercel@59.1.3 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 pull --yes --environment=production --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Build production
-        run: pnpm dlx vercel@59.1.3 build --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 build --prod --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Deploy production
-        run: pnpm dlx vercel@59.1.3 deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 deploy --prebuilt --prod --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
       - name: Smoke test
         run: |
           login_status="$(curl --silent --output /dev/null --write-out '%{http_code}' --retry 5 --retry-delay 3 "https://jastipin-cms.vercel.app/login")"
