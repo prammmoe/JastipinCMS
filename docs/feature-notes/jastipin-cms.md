@@ -149,3 +149,12 @@ Branch: `main`
 - Invalid mutation Origin is rejected with `403` in production.
 - Vercel Preview and Production builds completed successfully and their stable aliases point to the latest deployments.
 - ESLint, strict TypeScript, all 10 unit/architecture tests, the production build, workflow YAML parsing, and repository secret scanning passed; Playwright E2E was skipped at the user's request.
+
+## 2026-08-15 - Fix Vercel CLI installation in GitHub Actions
+
+### Bugs And Fixes
+- Bug: `pnpm add --global vercel@59.1.3` failed on GitHub-hosted runners because pnpm's global binary directory was not present in `PATH`.
+  Fix: Removed global installation and invoked the pinned CLI through `pnpm dlx vercel@59.1.3` for pull, build, deploy, and alias operations in both deployment workflows.
+
+### Verification
+- Both workflow files parse as valid YAML and no unpinned or global Vercel CLI invocation remains.
