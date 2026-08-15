@@ -13,7 +13,7 @@ const inter = localFont({
   variable: "--font-inter",
 });
 
-const isProduction = process.env.NODE_ENV === "production";
+const isProduction = process.env.VERCEL_ENV === "production";
 
 export const metadata: Metadata = {
   title: isProduction ? "JASTIPin CMS" : "JASTIPin CMS Staging",
