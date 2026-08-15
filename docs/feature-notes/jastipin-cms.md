@@ -13,7 +13,7 @@ Branch: `main`
 - Added server-generated grouped closing PDF/XLSX/CSV, package CSV export, private file proxying, and database-backed settings.
 
 ### Stayed The Same
-- Application workflows and API contracts are unchanged by the later environment split.
+- Application workflowss and API contracts are unchanged by the later environment split.
 
 ### Bugs And Fixes
 - Bug: Pickup locking originally combined `FOR UPDATE` with an aggregate query.
@@ -149,3 +149,39 @@ Branch: `main`
 - Invalid mutation Origin is rejected with `403` in production.
 - Vercel Preview and Production builds completed successfully and their stable aliases point to the latest deployments.
 - ESLint, strict TypeScript, all 10 unit/architecture tests, the production build, workflow YAML parsing, and repository secret scanning passed; Playwright E2E was skipped at the user's request.
+
+## 2026-08-15 - Fix Vercel CLI installation in GitHub Actions
+
+### Bugs And Fixes
+- Bug: `pnpm add --global vercel@59.1.3` failed on GitHub-hosted runners because pnpm's global binary directory was not present in `PATH`.
+  Fix: Removed global installation and invoked the pinned CLI through `pnpm dlx vercel@59.1.3` for pull, build, deploy, and alias operations in both deployment workflows.
+
+### Verification
+- Both workflow files parse as valid YAML and no unpinned or global Vercel CLI invocation remains.
+
+## 2026-08-15 - Make Vercel project linking explicit in CI
+
+### Bugs And Fixes
+- Bug: Vercel CLI ran successfully in GitHub Actions but could not auto-resolve the project settings from environment IDs.
+  Fix: Added a non-secret API access preflight and an explicit `vercel link` using the configured Team ID and Project ID before pulling environment settings.
+
+### Verification
+- Staging and production workflows validate Vercel access without printing tokens and provide actionable HTTP status errors for invalid token scope or resource IDs.
+
+## 2026-08-15 - Avoid deprecated Vercel team linking
+
+### Bugs And Fixes
+- Bug: Vercel CLI 59 deprecated `link --team` and attempted to resolve the configured Team ID as a user, returning `User not found (404)` despite successful project API access.
+  Fix: Generate the standard `.vercel/project.json` link file from `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` inside the runner, then pull settings through that explicit link.
+
+### Verification
+- Neither workflow invokes `vercel link` or the deprecated `--team` option, while both retain the token/project access preflight.
+
+## 2026-08-15 - Scope Vercel CLI commands to the project team
+
+### Bugs And Fixes
+- Bug: Vercel's generic `Could not retrieve Project Settings` message hid a team-permission failure because CLI project requests used the default personal scope, while the API preflight explicitly supplied the Team ID.
+  Fix: Added the non-secret `prammmoes-projects` team slug as `VERCEL_SCOPE` and passed `--scope` to pull, build, deploy, and alias commands.
+
+### Verification
+- Every Vercel CLI command that accesses project state now selects the same team scope as the successful API preflight.
