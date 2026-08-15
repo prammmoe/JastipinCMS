@@ -13,12 +13,18 @@ const inter = localFont({
   variable: "--font-inter",
 });
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export const metadata: Metadata = {
-  title: "JASTIPin CMS",
+  title: isProduction ? "JASTIPin CMS" : "JASTIPin CMS Staging",
   description: "Sistem informasi operasional internal JASTIPin",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="id" className={inter.variable}>
       <body>{children}</body>
