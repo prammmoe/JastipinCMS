@@ -167,3 +167,12 @@ Branch: `main`
 
 ### Verification
 - Staging and production workflows validate Vercel access without printing tokens and provide actionable HTTP status errors for invalid token scope or resource IDs.
+
+## 2026-08-15 - Avoid deprecated Vercel team linking
+
+### Bugs And Fixes
+- Bug: Vercel CLI 59 deprecated `link --team` and attempted to resolve the configured Team ID as a user, returning `User not found (404)` despite successful project API access.
+  Fix: Generate the standard `.vercel/project.json` link file from `VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` inside the runner, then pull settings through that explicit link.
+
+### Verification
+- Neither workflow invokes `vercel link` or the deprecated `--team` option, while both retain the token/project access preflight.

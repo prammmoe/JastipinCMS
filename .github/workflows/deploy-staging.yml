@@ -54,10 +54,16 @@ jobs:
             echo "Vercel project access failed with HTTP $status. Check VERCEL_TOKEN scope, VERCEL_ORG_ID, and VERCEL_PROJECT_ID."
             exit 1
           fi
-      - name: Link staging Vercel project
-        run: pnpm dlx vercel@59.1.3 link --yes --team="$VERCEL_ORG_ID" --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
+      - name: Configure staging Vercel project link
+        run: |
+          mkdir -p .vercel
+          jq -n \
+            --arg orgId "$VERCEL_ORG_ID" \
+            --arg projectId "$VERCEL_PROJECT_ID" \
+            '{orgId: $orgId, projectId: $projectId}' \
+            > .vercel/project.json
       - name: Pull staging project settings
-        run: pnpm dlx vercel@59.1.3 pull --yes --environment=preview --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
+        run: pnpm dlx vercel@59.1.3 pull --yes --environment=preview --token="$VERCEL_TOKEN"
       - name: Build staging
         run: pnpm dlx vercel@59.1.3 build --token="$VERCEL_TOKEN"
       - name: Deploy and assign stable staging URL
