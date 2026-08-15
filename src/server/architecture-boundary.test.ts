@@ -1,0 +1,5 @@
+import { describe,expect,it } from "vitest";
+import { readFileSync,readdirSync,statSync } from "node:fs";
+import path from "node:path";
+function files(dir:string):string[]{return readdirSync(dir).filter((name)=>!["node_modules",".git",".next","coverage"].includes(name)).flatMap((name)=>{const full=path.join(dir,name);return statSync(full).isDirectory()?files(full):[full]})}
+describe("Supabase architecture boundary",()=>{ it("keeps supabase-js out of browser-capable modules",()=>{ const offenders=files(path.resolve("src")).filter((file)=>!file.includes(`${path.sep}server${path.sep}`)&&/\.[tj]sx?$/.test(file)&&readFileSync(file,"utf8").includes("@supabase/supabase-js")); expect(offenders).toEqual([]); }); it("does not expose public Supabase variables",()=>{ const forbidden="NEXT_PUBLIC_"+"SUPABASE_";const offenders=files(path.resolve(".")).filter((file)=>!file.endsWith("architecture-boundary.test.ts")&&readFileSync(file,"utf8").includes(forbidden)); expect(offenders).toEqual([]); }); });
