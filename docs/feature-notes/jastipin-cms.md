@@ -13,7 +13,7 @@ Branch: `main`
 - Added server-generated grouped closing PDF/XLSX/CSV, package CSV export, private file proxying, and database-backed settings.
 
 ### Stayed The Same
-- Application workflows and API contracts are unchanged by the later environment split.
+- Application workflowss and API contracts are unchanged by the later environment split.
 
 ### Bugs And Fixes
 - Bug: Pickup locking originally combined `FOR UPDATE` with an aggregate query.
