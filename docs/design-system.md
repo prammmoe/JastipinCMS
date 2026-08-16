@@ -2,7 +2,7 @@
 
 ## Direction
 
-JASTIPin uses a quiet, operational interface inspired by modern analytics and commerce admin tools. White and warm gray remain the foundation, while a focused rose-pink accent creates hierarchy across primary actions, active navigation, focus states, and compact highlights. Pink is used deliberately rather than as a large background so dense operational data remains the focus.
+JASTIPin uses a quiet, operational interface inspired by modern analytics and commerce admin tools. White and warm gray remain the foundation, while a focused rose-pink accent creates hierarchy across primary actions, active navigation, focus states, and compact highlights. Pink is used deliberately rather than as a large backgrounds so dense operational data remains the focus.
 
 ## Foundations
 
