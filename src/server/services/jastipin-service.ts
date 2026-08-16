@@ -24,6 +24,7 @@ import {
 } from "@/server/storage/cloudinary-storage";
 import {
   closingSchema,
+  customerHistorySchema,
   customerSchema,
   expenseSchema,
   packageIntakeSchema,
@@ -143,7 +144,7 @@ export class JastipinService {
     const method = request.method;
     if (resource === "dashboard" && method === "GET") return this.dashboard();
     if (resource === "customers")
-      return this.customers(request, method, id, actor);
+      return this.customers(request, method, id, action, actor);
     if (resource === "rate-configs") return this.rates(request, method, id);
     if (resource === "packages" && id === "export")
       return exportPackagesCsv(request);
@@ -244,6 +245,7 @@ export class JastipinService {
     request: NextRequest,
     method: string,
     id: string | undefined,
+    action: string | undefined,
     actor: Actor,
   ) {
     if (method === "GET" && id === "suggestions") {
@@ -260,6 +262,8 @@ export class JastipinService {
         ),
       );
     }
+    if (method === "GET" && id && action === "packages")
+      return this.customerPackagesHistory(request, id);
     if (method === "GET" && id)
       return ok(
         db(
@@ -339,6 +343,34 @@ export class JastipinService {
       undefined,
       404,
     );
+  }
+
+  private async customerPackagesHistory(request: NextRequest, id: string) {
+    const customerId = requireId(id);
+    const p = customerHistorySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams),
+    );
+    let query = this.client
+      .from("packages")
+      .select("id,package_code,tracking_number,status,shipping_fee_idr,received_date,received_time")
+      .eq("customer_id", customerId);
+    if (p.from) query = query.gte("received_date", p.from);
+    if (p.to) query = query.lte("received_date", p.to);
+    if (p.year && p.month) {
+      const from = `${p.year}-${String(p.month).padStart(2, "0")}-01`;
+      const to = new Date(Date.UTC(p.year, p.month + 1, 0))
+        .toISOString()
+        .slice(0, 10);
+      query = query.gte("received_date", from).lte("received_date", to);
+    }
+    if (p.status) query = query.eq("status", p.status);
+    const result = await query
+      .order("received_date", { ascending: false })
+      .order("received_time", { ascending: false })
+      .order("id", { ascending: true })
+      .limit(500);
+    if (result.error) mapDatabaseError(result.error);
+    return ok(result.data);
   }
 
   private async rates(request: NextRequest, method: string, id?: string) {
@@ -479,6 +511,8 @@ export class JastipinService {
         ),
       );
     }
+    if (method === "GET" && id === "grouped-by-customer")
+      return this.groupedPackages(request);
     if (method === "GET" && id) {
       const data = db(
         await this.client
@@ -537,13 +571,22 @@ export class JastipinService {
         .select("*,customers(id,code,name)", { count: "exact" });
       if (p.search) {
         const term = clean(p.search);
+        const orTerms = `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`;
+        const customerResult = await this.client
+          .from("customers")
+          .select("id")
+          .or(`name.ilike.%${term}%,code.ilike.%${term}%`);
+        const ids = (customerResult.data ?? []).map((row) => row.id);
         query = query.or(
-          `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`,
+          ids.length
+            ? `${orTerms},customer_id.in.(${ids.join(",")})`
+            : orTerms,
         );
       }
       if (p.status) query = query.eq("status", p.status);
       if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
       if (p.dateTo) query = query.lte("received_date", p.dateTo);
+      if (p.customerId) query = query.eq("customer_id", p.customerId);
       if (p.sort === "fee_desc")
         query = query
           .order("shipping_fee_idr", { ascending: false })
@@ -961,6 +1004,90 @@ export class JastipinService {
       undefined,
       404,
     );
+  }
+
+  private async groupedPackages(request: NextRequest) {
+    const p = packageListSchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams),
+    );
+    const from = (p.page - 1) * p.pageSize;
+    const to = p.page * p.pageSize - 1;
+    let query = this.client
+      .from("packages")
+      .select("*,customers(id,code,name)", { count: "exact" });
+    if (p.search) {
+      const term = clean(p.search);
+      const orTerms = `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`;
+      const customerResult = await this.client
+        .from("customers")
+        .select("id")
+        .or(`name.ilike.%${term}%,code.ilike.%${term}%`);
+      const ids = (customerResult.data ?? []).map((row) => row.id);
+      query = query.or(
+        ids.length
+          ? `${orTerms},customer_id.in.(${ids.join(",")})`
+          : orTerms,
+      );
+    }
+    if (p.status) query = query.eq("status", p.status);
+    if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
+    if (p.dateTo) query = query.lte("received_date", p.dateTo);
+    if (p.customerId) query = query.eq("customer_id", p.customerId);
+    const result = await query
+      .order("received_date", { ascending: false })
+      .order("received_time", { ascending: false })
+      .order("id", { ascending: true })
+      .range(from, to);
+    if (result.error) mapDatabaseError(result.error);
+
+    const rows = result.data ?? [];
+    const groups = new Map<
+      string,
+      {
+        customer: { id: string; code: string; name: string } | null;
+        packages: typeof rows;
+      }
+    >();
+    for (const row of rows) {
+      const customer = (row.customers as {
+        id: string;
+        code: string;
+        name: string;
+      } | null);
+      const key = row.customer_id ?? "__none__";
+      const existing = groups.get(key);
+      if (existing) existing.packages.push(row);
+      else
+        groups.set(key, {
+          customer: customer?.id ? customer : null,
+          packages: [row],
+        });
+    }
+
+    const list = [...groups.values()]
+      .map((group) => ({
+        customer: group.customer,
+        packageCount: group.packages.length,
+        totalFee: group.packages.reduce(
+          (sum, row) => sum + Number(row.shipping_fee_idr ?? 0),
+          0,
+        ),
+        packages: group.packages,
+      }))
+      .sort((a, b) => {
+        if (p.sort === "name_asc" || p.sort === "name_desc") {
+          const left = a.customer?.name ?? "";
+          const right = b.customer?.name ?? "";
+          return p.sort === "name_asc"
+            ? left.localeCompare(right)
+            : right.localeCompare(left);
+        }
+        if (p.sort === "packages_desc")
+          return b.packageCount - a.packageCount;
+        return new Date(b.packages[0]?.received_date ?? 0).getTime() -
+          new Date(a.packages[0]?.received_date ?? 0).getTime();
+      });
+    return ok(list, pageMeta(p.page, p.pageSize, result.count ?? 0));
   }
 
   private async closings(

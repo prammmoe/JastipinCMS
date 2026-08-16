@@ -3,6 +3,7 @@
 import { KeyboardEvent, useEffect, useId, useState } from "react";
 import { Check, UserPlus } from "lucide-react";
 import { api } from "@/lib/api-client/client";
+import { ComboboxOptionsSkeleton } from "@/components/ui/skeleton";
 
 type CustomerOption = {
   id: string;
@@ -132,7 +133,7 @@ export function CustomerCombobox({
       {open && canSuggest && (
         <div className="combobox-menu" id={listboxId} role="listbox">
           {loading ? (
-            <div className="combobox-empty">Mencari customer...</div>
+            <ComboboxOptionsSkeleton />
           ) : suggestions.length ? (
             <>
               <div className="combobox-caption">Customer yang menyerupai</div>

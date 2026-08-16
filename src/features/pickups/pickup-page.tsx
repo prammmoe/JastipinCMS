@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { FormFieldsSkeleton } from "@/components/ui/skeleton";
 
 type Customer = { id: string; code: string; name: string };
 type Pkg = {
@@ -15,15 +16,18 @@ export function PickupPage() {
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [customer, setCustomer] = useState("");
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       api.get<Customer[]>("/api/v1/customers?pageSize=100"),
       api.get<Pkg[]>("/api/v1/packages?pageSize=100&status=READY_FOR_PICKUP"),
-    ]).then(([c, p]) => {
-      setCustomers(c);
-      setPackages(p);
-    });
+    ])
+      .then(([c, p]) => {
+        setCustomers(c);
+        setPackages(p);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -49,6 +53,15 @@ export function PickupPage() {
   }
 
   const available = packages.filter((p) => p.customer_id === customer);
+
+  if (loading) {
+    return (
+      <>
+        <h1>Pengambilan Paket</h1>
+        <FormFieldsSkeleton fields={4} />
+      </>
+    );
+  }
 
   return (
     <>

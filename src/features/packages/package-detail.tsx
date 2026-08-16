@@ -6,10 +6,12 @@ import { Pencil, RotateCcw, X } from "lucide-react";
 import { CourierCombobox } from "@/components/ui/courier-combobox";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
 import { ImageUploader, ImageUploaderHandle } from "@/components/ui/image-uploader";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
 import { packageStatusLabel } from "@/lib/package-status";
+import { statusTextClass } from "@/lib/status-text";
 
 type Customer = { id: string; code: string; name: string };
 type Attachment = { id: string; original_filename: string | null; type: string };
@@ -128,18 +130,23 @@ export function PackageDetail({ id }: { id: string }) {
     }
   }
 
-  if (!pkg) return <p>{error || "Memuat..."}</p>;
+  if (!pkg) {
+    if (error) return <p>{error}</p>;
+    return <DetailPageSkeleton />;
+  }
   const timeValue = pkg.received_time?.slice(0, 5) ?? "";
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", marginBottom: 20 }}>
         <div>
           <h1>{pkg.package_code}</h1>
-          <p className="muted">{pkg.tracking_number} · {formatReceivedDate(pkg.received_date, pkg.received_time)}</p>
+          <p className="muted" style={{ margin: "8px 0 0" }}>
+            No Resi: <strong>{pkg.tracking_number}</strong> · Diterima: {formatReceivedDate(pkg.received_date, pkg.received_time)}
+          </p>
         </div>
         {!editing && pkg.permissions.canEdit && (
-          <button className="button" type="button" onClick={startEdit}><Pencil size={16} /> Edit</button>
+          <button className="button" type="button" onClick={startEdit} style={{ minHeight: 44, padding: "10px 18px" }}><Pencil size={16} /> Edit</button>
         )}
       </div>
       {error && <div className="feedback error">{error}</div>}
@@ -191,19 +198,21 @@ export function PackageDetail({ id }: { id: string }) {
           </div>
         </form>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(280px,420px)", gap: 20, alignItems: "start" }}>
           <div className="card" style={{ padding: 20 }}>
-            <h3>Data Paket</h3>
-            <p>Status: <span className="badge">{packageStatusLabel(pkg.status)}</span></p>
-            <p>Harga: <strong>{formatIdr(pkg.shipping_fee_idr)}</strong></p>
-            <p>Berat: <strong>{pkg.actual_weight_kg} kg</strong></p>
-            <p>Kurir: <strong>{pkg.courier || "—"}</strong></p>
-            <p>Dimensi: <strong>{pkg.length_cm && pkg.width_cm && pkg.height_cm ? `${pkg.length_cm} × ${pkg.width_cm} × ${pkg.height_cm} cm` : "—"}</strong></p>
-            {pkg.notes && <p className="muted">{pkg.notes}</p>}
+            <h3 style={{ marginBottom: 16 }}>Data Paket</h3>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div><span className="label">Customer</span><div><strong>{pkg.customers?.name ?? "Belum ditetapkan"}</strong> {pkg.customers?.code && <span className="muted" style={{ marginLeft: 8 }}>{pkg.customers.code}</span>}</div></div>
+              <div><span className="label">Status</span><div><span className={statusTextClass(pkg.status)}>{packageStatusLabel(pkg.status)}</span></div></div>
+              <div><span className="label">Harga</span><div style={{ fontSize: 15 }}><strong>{formatIdr(pkg.shipping_fee_idr)}</strong></div></div>
+              <div><span className="label">Berat</span><div><strong>{pkg.actual_weight_kg} kg</strong></div></div>
+              <div><span className="label">Kurir</span><div><strong>{pkg.courier || "—"}</strong></div></div>
+              <div><span className="label">Dimensi</span><div><strong>{pkg.length_cm && pkg.width_cm && pkg.height_cm ? `${pkg.length_cm} × ${pkg.width_cm} × ${pkg.height_cm} cm` : "—"}</strong></div></div>
+              {pkg.notes && <div><span className="label">Catatan</span><div className="muted" style={{ lineHeight: 1.55 }}>{pkg.notes}</div></div>}
+            </div>
           </div>
-          <div className="card" style={{ padding: 20 }}><h3>Customer</h3><p><strong>{pkg.customers?.name ?? "Belum ditetapkan"}</strong></p>{pkg.customers?.code && <p className="muted">{pkg.customers.code}</p>}</div>
-          <div className="card" style={{ padding: 20 }}>
-            <h3>Bukti Foto</h3>
+          <div>
+            <h3 style={{ marginBottom: 14 }}>Bukti Foto</h3>
             <div className="package-photo-grid">
               {pkg.package_attachments.map((attachment) => (
                 <a className="package-photo" key={attachment.id} href={`/api/v1/files/${attachment.id}`} target="_blank" rel="noreferrer">

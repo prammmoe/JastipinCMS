@@ -29,8 +29,41 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   return payload.data as T;
 }
+
+async function requestPaged<T>(path: string): Promise<PagedResult<T>> {
+  const response = await fetch(path, {
+    credentials: "same-origin",
+    headers: { "content-type": "application/json" },
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    if (
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      !location.pathname.startsWith("/login")
+    )
+      location.assign("/login");
+    throw new ApiClientError(
+      payload.error?.code ?? "API_ERROR",
+      payload.error?.message ?? "Permintaan gagal.",
+      payload.error?.details,
+    );
+  }
+  return { data: payload.data as T, meta: payload.meta };
+}
+
+export type PagedResult<T> = {
+  data: T;
+  meta?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+};
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getPaged: <T>(path: string) => requestPaged<T>(path),
   post: <T>(path: string, body?: unknown, headers?: HeadersInit) =>
     request<T>(path, {
       method: "POST",

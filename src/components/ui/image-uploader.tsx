@@ -66,30 +66,44 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
 
     useEffect(() => closeCamera, [closeCamera]);
 
+    useEffect(() => {
+      if (!cameraOpen) return;
+      const video = videoRef.current;
+      const stream = streamRef.current;
+      if (video && stream) {
+        video.srcObject = stream;
+        void video.play().catch(() => {});
+      }
+    }, [cameraOpen]);
+
     async function openCamera() {
       setCameraError("");
       if (!navigator.mediaDevices?.getUserMedia) {
         cameraInputRef.current?.click();
         return;
       }
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false,
-        });
-        streamRef.current = stream;
-        setCameraOpen(true);
-        window.setTimeout(() => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            void videoRef.current.play();
-          }
-        });
-      } catch {
+      const candidates: MediaStreamConstraints[] = [
+        { video: { facingMode: { exact: "environment" } }, audio: false },
+        { video: { facingMode: { ideal: "environment" } }, audio: false },
+        { video: true, audio: false },
+      ];
+      let stream: MediaStream | null = null;
+      for (const constraints of candidates) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+          break;
+        } catch {
+          // coba constraint berikutnya
+        }
+      }
+      if (!stream) {
         setCameraError(
           "Kamera tidak dapat diakses. Izinkan kamera di pengaturan browser atau gunakan Galeri.",
         );
+        return;
       }
+      streamRef.current = stream;
+      setCameraOpen(true);
     }
 
     function takePhoto() {
@@ -201,9 +215,31 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
           <div className="camera-overlay" role="dialog" aria-modal="true" aria-label="Ambil foto">
             <div className="camera-panel">
               <video ref={videoRef} playsInline muted />
-              <div style={{ display: "flex", gap: 10 }}>
-                <button type="button" className="button" onClick={takePhoto}>Ambil Foto</button>
-                <button type="button" className="button secondary" onClick={closeCamera}>Batal</button>
+              <div className="camera-actions">
+                <button
+                  type="button"
+                  className="camera-close"
+                  onClick={closeCamera}
+                  aria-label="Tutup kamera"
+                >
+                  <X size={22} />
+                </button>
+                <button
+                  type="button"
+                  className="camera-shutter"
+                  onClick={takePhoto}
+                  aria-label="Ambil foto"
+                >
+                  <span />
+                </button>
+                <button
+                  type="button"
+                  className="camera-gallery"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Buka galeri"
+                >
+                  <ImageIcon size={22} />
+                </button>
               </div>
             </div>
           </div>

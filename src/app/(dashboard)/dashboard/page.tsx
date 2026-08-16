@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { MetricCardsSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
 import { formatIdr } from "@/lib/formatters";
 
@@ -16,9 +17,13 @@ type Metrics = {
 
 export default function Dashboard() {
   const [data, setData] = useState<Metrics>();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get<Metrics>("/api/v1/dashboard").then(setData);
+    api
+      .get<Metrics>("/api/v1/dashboard")
+      .then(setData)
+      .finally(() => setLoading(false));
   }, []);
 
   const cards = [
@@ -46,32 +51,36 @@ export default function Dashboard() {
         title="Dashboard"
         description="Ringkasan operasional JASTIPin hari ini."
       />
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
-          gap: 14,
-        }}
-      >
-        {cards.map((label, index) => (
-          <div className="card" key={label} style={{ padding: 20 }}>
-            <div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>
-              {label}
+      {loading ? (
+        <MetricCardsSkeleton count={6} />
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))",
+            gap: 14,
+          }}
+        >
+          {cards.map((label, index) => (
+            <div className="card" key={label} style={{ padding: 20 }}>
+              <div className="muted" style={{ fontSize: 12, fontWeight: 500 }}>
+                {label}
+              </div>
+              <div
+                style={{
+                  marginTop: 12,
+                  fontSize: 27,
+                  lineHeight: 1.2,
+                  fontWeight: 600,
+                  letterSpacing: "-0.04em",
+                }}
+              >
+                {values[index]}
+              </div>
             </div>
-            <div
-              style={{
-                marginTop: 12,
-                fontSize: 27,
-                lineHeight: 1.2,
-                fontWeight: 600,
-                letterSpacing: "-0.04em",
-              }}
-            >
-              {values[index]}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { FormFieldsSkeleton } from "@/components/ui/skeleton";
 import { formatIdr } from "@/lib/formatters";
 type Invoice = {
   id: string;
@@ -12,10 +13,12 @@ type Invoice = {
 export function PaymentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
   const load = () =>
     api
       .get<Invoice[]>("/api/v1/invoices?pageSize=100&status=UNPAID")
-      .then(setInvoices);
+      .then(setInvoices)
+      .finally(() => setLoading(false));
 
   useEffect(() => {
     load();
@@ -43,6 +46,15 @@ export function PaymentPage() {
       setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
     }
   }
+  if (loading) {
+    return (
+      <>
+        <h1>Pembayaran</h1>
+        <FormFieldsSkeleton fields={4} />
+      </>
+    );
+  }
+
   return (
     <>
       <h1>Pembayaran</h1>

@@ -2,7 +2,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 import { formatIdr } from "@/lib/formatters";
+import { statusTextClass } from "@/lib/status-text";
 
 type Pkg = {
   id: string;
@@ -59,7 +61,7 @@ export function ClosingDetail({ id }: { id: string }) {
     }
   }
 
-  if (!closing) return <p>Memuat...</p>;
+  if (!closing) return <DetailPageSkeleton />;
   return (
     <>
       <div
@@ -72,7 +74,7 @@ export function ClosingDetail({ id }: { id: string }) {
       >
         <div>
           <h1>{closing.code}</h1>
-          <span className="badge">{closing.status}</span>
+          <span className={statusTextClass(closing.status)}>{closing.status.replaceAll("_", " ")}</span>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <a

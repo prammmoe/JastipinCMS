@@ -2,6 +2,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 
 export function EntityDetail({ section, id }: { section: string; id: string }) {
   const endpoint = section === "packages" ? "packages" : section;
@@ -103,11 +104,15 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
           {message}
         </div>
       )}
-      <div className="card" style={{ padding: 20, overflowX: "auto" }}>
-        <pre style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
-          {data ? JSON.stringify(data, null, 2) : "Memuat..."}
-        </pre>
-      </div>
+      {!data ? (
+        <DetailPageSkeleton />
+      ) : (
+        <div className="card" style={{ padding: 20, overflowX: "auto" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      )}
     </>
   );
 }

@@ -1,11 +1,14 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { PackagePlus } from "lucide-react";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
 import { CourierCombobox } from "@/components/ui/courier-combobox";
-import { ImageUploader, type ImageUploaderHandle } from "@/components/ui/image-uploader";
+import {
+  ImageUploader,
+  type ImageUploaderHandle,
+} from "@/components/ui/image-uploader";
 import { PageHeader } from "@/components/ui/page-header";
+import { Snackbar, SnackbarType } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 
@@ -13,8 +16,10 @@ export default function IncomingPage() {
   const tracking = useRef<HTMLInputElement>(null);
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
   const [formResetSignal, setFormResetSignal] = useState(0);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [snackbar, setSnackbar] = useState<{
+    message: string;
+    type: SnackbarType;
+  } | null>(null);
   const [duplicate, setDuplicate] = useState(false);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -22,8 +27,7 @@ export default function IncomingPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setMessage("");
+    setSnackbar(null);
     const form = event.currentTarget;
     const data = new FormData(form);
 
@@ -52,7 +56,10 @@ export default function IncomingPage() {
     try {
       const files = imageUploaderRef.current?.getFiles() ?? [];
       if (files.length === 0) {
-        setError("Minimal satu foto bukti wajib diunggah.");
+        setSnackbar({
+          message: "Minimal satu foto bukti wajib diunggah.",
+          type: SnackbarType.Warning,
+        });
         return;
       }
       const requestForm = new FormData();
@@ -63,7 +70,10 @@ export default function IncomingPage() {
         requestForm,
       );
 
-      setMessage(`${result.package_code} berhasil dicatat.`);
+      setSnackbar({
+        message: `${result.package_code} berhasil dicatat.`,
+        type: SnackbarType.Success,
+      });
       form.reset();
       imageUploaderRef.current?.clear();
       setFormResetSignal((current) => current + 1);
@@ -75,13 +85,16 @@ export default function IncomingPage() {
         value.code === "PACKAGE_DUPLICATE_TRACKING"
       ) {
         setDuplicate(true);
-        setError(
-          "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
-        );
+        setSnackbar({
+          message: "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
+          type: SnackbarType.Warning,
+        });
       } else {
-        setError(
-          value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
-        );
+        setSnackbar({
+          message:
+            value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
+          type: SnackbarType.Failed,
+        });
       }
     }
   }
@@ -90,34 +103,11 @@ export default function IncomingPage() {
     <>
       <PageHeader
         title="Barang Masuk"
-        description="Catat paket berikutnya tanpa meninggalkan halaman ini. Input nomor resi tetap fokus untuk penggunaan scanner."
+        description="Dashboard untuk mencatat paket yang diterima."
       />
 
-      <form
-        className="card"
-        onSubmit={submit}
-        style={{ padding: 24, display: "grid", gap: 22 }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="brand-mark" style={{ width: 32, height: 32 }}>
-            <PackagePlus size={16} />
-          </span>
-          <div>
-            <h3 style={{ marginBottom: 2 }}>Informasi paket</h3>
-            <span className="muted" style={{ fontSize: 12 }}>
-              Nomor resi dan pemilik paket
-            </span>
-          </div>
-        </div>
-
-        <div
-          className="grid-responsive"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr 1fr",
-            gap: 16,
-          }}
-        >
+      <form className="card" onSubmit={submit} style={{ padding: 20 }}>
+        <div className="form-grid" style={{ display: "grid", gap: 16 }}>
           <label>
             <span className="label">Nomor resi *</span>
             <input
@@ -129,6 +119,7 @@ export default function IncomingPage() {
               placeholder="Ketik lalu klik Enter"
             />
           </label>
+          <CustomerCombobox key={`customer-${formResetSignal}`} required />
           <CourierCombobox key={`courier-${formResetSignal}`} />
           <label>
             <span className="label">Status *</span>
@@ -137,70 +128,112 @@ export default function IncomingPage() {
               <option value="DAMAGED">Diterima Rusak</option>
             </select>
           </label>
-          <CustomerCombobox key={`customer-${formResetSignal}`} required />
-        </div>
-
-        <div style={{ height: 1, background: "var(--border)" }} />
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}
-        >
-          <label>
-            <span className="label">Berat aktual (kg) *</span>
-            <input className="input" name="actualWeightKg" type="number" step="0.001" min="0.001" required />
-          </label>
-          {["lengthCm", "widthCm", "heightCm"].map((name, index) => (
-            <label key={name}>
-              <span className="label">
-                {["Panjang", "Lebar", "Tinggi"][index]} (cm)
-              </span>
-              <input className="input" name={name} type="number" step="0.01" min="0" />
-            </label>
-          ))}
-        </div>
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}
-        >
-          <label>
-            <span className="label">Harga *</span>
-            <input className="input" name="harga" type="number" min="1" placeholder="Nominal harga" required />
-          </label>
           <label>
             <span className="label">Tanggal terima *</span>
-            <input className="input" name="receivedDate" type="date" defaultValue={today} required />
+            <input
+              className="input"
+              name="receivedDate"
+              type="date"
+              defaultValue={today}
+              required
+            />
           </label>
           <label>
             <span className="label">Waktu terima</span>
             <input className="input" name="receivedTime" type="time" />
           </label>
           <label>
-            <span className="label">Catatan</span>
-            <input className="input" name="catatan" placeholder="Catatan tambahan" />
+            <span className="label">Berat aktual (kg) *</span>
+            <input
+              className="input"
+              name="actualWeightKg"
+              type="number"
+              min="0.001"
+              step="0.001"
+              required
+            />
+          </label>
+          <label>
+            <span className="label">Harga *</span>
+            <input
+              className="input"
+              name="harga"
+              type="number"
+              min="1"
+              placeholder="Nominal harga"
+              required
+            />
+          </label>
+          <label>
+            <span className="label">Panjang (cm)</span>
+            <input
+              className="input"
+              name="lengthCm"
+              type="number"
+              min="0.01"
+              step="0.01"
+            />
+          </label>
+          <label>
+            <span className="label">Lebar (cm)</span>
+            <input
+              className="input"
+              name="widthCm"
+              type="number"
+              min="0.01"
+              step="0.01"
+            />
+          </label>
+          <label>
+            <span className="label">Tinggi (cm)</span>
+            <input
+              className="input"
+              name="heightCm"
+              type="number"
+              min="0.01"
+              step="0.01"
+            />
           </label>
         </div>
+        <label style={{ display: "block", marginTop: 16 }}>
+          <span className="label">Catatan</span>
+          <textarea
+            className="input"
+            name="catatan"
+            placeholder="Catatan tambahan"
+            rows={3}
+          />
+        </label>
 
-        <div style={{ height: 1, background: "var(--border)" }} />
+        {duplicate && (
+          <label style={{ display: "block", marginTop: 16 }}>
+            <span className="label">Alasan menyimpan resi duplikat *</span>
+            <input
+              className="input"
+              name="duplicateOverrideReason"
+              required
+              autoFocus
+            />
+          </label>
+        )}
 
-        <div>
-          <span className="label">Foto Bukti *</span>
+        <div style={{ marginTop: 18 }}>
+          <span className="label">Bukti foto * (total 1–2)</span>
           <ImageUploader ref={imageUploaderRef} maxFiles={2} />
         </div>
 
-        {duplicate && (
-          <label>
-            <span className="label">Alasan menyimpan resi duplikat *</span>
-            <input className="input" name="duplicateOverrideReason" required autoFocus />
-          </label>
-        )}
-        {error && <div className="feedback error">{error}</div>}
-        {message && <div className="feedback">{message}</div>}
-        <div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button className="button">Simpan &amp; Paket Berikutnya</button>
         </div>
       </form>
+
+      {snackbar && (
+        <Snackbar
+          message={snackbar.message}
+          type={snackbar.type}
+          onClose={() => setSnackbar(null)}
+        />
+      )}
     </>
   );
 }

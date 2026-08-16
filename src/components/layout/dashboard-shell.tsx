@@ -7,19 +7,15 @@ import {
   Archive,
   Boxes,
   ChartNoAxesCombined,
-  CreditCard,
-  HandCoins,
   LayoutDashboard,
   LogOut,
   Menu,
   PackageCheck,
   PackagePlus,
   ReceiptText,
-  ScanLine,
   Settings,
   Ship,
   Users,
-  WalletCards,
   X,
 } from "lucide-react";
 import { api } from "@/lib/api-client/client";
@@ -34,24 +30,13 @@ const groups = [
       ["/packages", "Semua Barang", Boxes],
       ["/closings", "Closing", Archive],
       ["/shipments", "Pengiriman", Ship],
-      ["/arrivals", "Kedatangan", ScanLine],
-      ["/pickups", "Pengambilan", HandCoins],
     ],
   },
   { label: "DATA", items: [["/customers", "Customer", Users]] },
   {
-    label: "KEUANGAN",
-    items: [
-      ["/invoices", "Tagihan", ReceiptText],
-      ["/payments", "Pembayaran", CreditCard],
-      ["/expenses", "Pengeluaran", WalletCards],
-    ],
-  },
-  {
     label: "LAPORAN",
     items: [
       ["/reports-operational", "Operasional", ChartNoAxesCombined],
-      ["/reports-financial", "Keuangan", ChartNoAxesCombined],
     ],
   },
   {
@@ -67,10 +52,6 @@ const groups = [
 
 const restricted: Record<string, string[]> = {
   STAFF_SIDOARJO: [
-    "/arrivals",
-    "/pickups",
-    "/payments",
-    "/expenses",
     "/rates",
     "/users",
     "/audit-log",
@@ -79,8 +60,6 @@ const restricted: Record<string, string[]> = {
   STAFF_MERAUKE: [
     "/incoming",
     "/closings",
-    "/payments",
-    "/expenses",
     "/rates",
     "/users",
     "/audit-log",
