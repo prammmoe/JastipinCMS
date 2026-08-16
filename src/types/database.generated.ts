@@ -156,6 +156,10 @@ export type Database = {
           customer_id_snapshot: string | null;
           id: string;
           is_active: boolean;
+          merauke_check_status: Database["public"]["Enums"]["merauke_check_status"];
+          merauke_checked_at: string | null;
+          merauke_checked_by: string | null;
+          merauke_notes: string | null;
           package_id: string;
           shipping_fee_snapshot_idr: number | null;
         };
@@ -167,6 +171,10 @@ export type Database = {
           customer_id_snapshot?: string | null;
           id?: string;
           is_active?: boolean;
+          merauke_check_status?: Database["public"]["Enums"]["merauke_check_status"];
+          merauke_checked_at?: string | null;
+          merauke_checked_by?: string | null;
+          merauke_notes?: string | null;
           package_id: string;
           shipping_fee_snapshot_idr?: number | null;
         };
@@ -178,6 +186,10 @@ export type Database = {
           customer_id_snapshot?: string | null;
           id?: string;
           is_active?: boolean;
+          merauke_check_status?: Database["public"]["Enums"]["merauke_check_status"];
+          merauke_checked_at?: string | null;
+          merauke_checked_by?: string | null;
+          merauke_notes?: string | null;
           package_id?: string;
           shipping_fee_snapshot_idr?: number | null;
         };
@@ -1064,6 +1076,16 @@ export type Database = {
         Args: { p_actor_id: string; p_closing_id: string };
         Returns: string;
       };
+      mark_closing_merauke: {
+        Args: {
+          p_actor_id: string;
+          p_closing_id: string;
+          p_condition: string;
+          p_notes: string;
+          p_package_ids: string[];
+        };
+        Returns: string;
+      };
       next_business_code: {
         Args: { p_date?: string; p_prefix: string; p_scope: string };
         Returns: string;
@@ -1086,6 +1108,15 @@ export type Database = {
           p_notes: string;
           p_paid_at: string;
           p_reference: string;
+        };
+        Returns: string;
+      };
+      save_surabaya_closing: {
+        Args: {
+          p_actor_id: string;
+          p_closing_date: string;
+          p_notes: string;
+          p_package_ids: string[];
         };
         Returns: string;
       };
@@ -1118,6 +1149,7 @@ export type Database = {
         | "OTHER";
       internal_user_role: "ADMIN" | "STAFF_SIDOARJO" | "STAFF_MERAUKE";
       invoice_status: "UNPAID" | "PARTIAL" | "PAID" | "VOID";
+      merauke_check_status: "PENDING" | "OK" | "DAMAGED" | "MISSING";
       package_attachment_type: "RECEIVED" | "ARRIVAL" | "DAMAGED" | "OTHER";
       package_charge_type: "WEIGHT" | "VOLUMETRIC" | "FIXED" | "MANUAL";
       package_status:

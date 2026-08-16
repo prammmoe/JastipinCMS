@@ -8,7 +8,11 @@ export type Capability =
   | "packages:receive"
   | "packages:edit"
   | "packages:arrive"
-  | "closings:manage"
+  | "closings:view"
+  | "closings:create"
+  | "closings:edit"
+  | "closings:crosscheck"
+  | "shipping-history:view"
   | "shipments:manage"
   | "pickups:manage"
   | "invoices:view"
@@ -24,7 +28,11 @@ const matrix: Record<InternalRole, Capability[]> = {
     "packages:receive",
     "packages:edit",
     "packages:arrive",
-    "closings:manage",
+    "closings:view",
+    "closings:create",
+    "closings:edit",
+    "closings:crosscheck",
+    "shipping-history:view",
     "shipments:manage",
     "pickups:manage",
     "invoices:view",
@@ -38,7 +46,11 @@ const matrix: Record<InternalRole, Capability[]> = {
     "customers:manage",
     "packages:view",
     "packages:receive",
-    "closings:manage",
+    "packages:edit",
+    "closings:view",
+    "closings:create",
+    "closings:edit",
+    "shipping-history:view",
     "shipments:manage",
     "invoices:view",
     "reports:view",
@@ -48,7 +60,9 @@ const matrix: Record<InternalRole, Capability[]> = {
     "customers:manage",
     "packages:view",
     "packages:arrive",
-    "shipments:manage",
+    "closings:view",
+    "closings:crosscheck",
+    "shipping-history:view",
     "pickups:manage",
     "invoices:view",
     "reports:view",

@@ -1,67 +1,141 @@
 "use client";
-/* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
-import { formatIdr } from "@/lib/formatters";
+import { formatDate, formatIdr } from "@/lib/formatters";
 import { statusTextClass } from "@/lib/status-text";
+import type { Actor } from "@/types/domain";
 
-type Pkg = {
-  id: string;
-  package_code: string;
-  tracking_number: string;
-  shipping_fee_idr: string;
-  customers?: { name: string };
+type PackageRow = {
+  package_id: string;
+  is_active: boolean;
+  merauke_check_status: "PENDING" | "OK" | "DAMAGED" | "MISSING" | null;
+  merauke_notes: string | null;
+  packages: {
+    id: string;
+    package_code: string;
+    tracking_number: string;
+    shipping_fee_idr: string;
+    status: string;
+    customers?: { id: string; code: string; name: string } | null;
+  };
+};
+
+type CustomerGroup = {
+  key: string;
+  customer: { id: string; code: string; name: string } | null;
+  packages: PackageRow[];
 };
 
 type Closing = {
   id: string;
   code: string;
   status: string;
+  closing_date: string;
   total_amount_idr: string;
-  closing_packages: { package_id: string; packages: Pkg }[];
+  merauke_progress: string;
+  customer_groups: CustomerGroup[];
+};
+
+const CONDITION_LABEL: Record<string, string> = {
+  PENDING: "Belum dicek",
+  OK: "OK",
+  DAMAGED: "Rusak",
+  MISSING: "Hilang",
+};
+
+const CONDITION_CLASS: Record<string, string> = {
+  PENDING: "status-text",
+  OK: "status-text success",
+  DAMAGED: "status-text warning",
+  MISSING: "status-text danger",
 };
 
 export function ClosingDetail({ id }: { id: string }) {
   const [closing, setClosing] = useState<Closing>();
-  const [eligible, setEligible] = useState<Pkg[]>([]);
+  const [user, setUser] = useState<Actor>();
   const [selected, setSelected] = useState<string[]>([]);
-  const [message, setMessage] = useState("");
+  const [condition, setCondition] = useState("OK");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string }>();
 
-  const load = () =>
-    Promise.all([
-      api.get<Closing>(`/api/v1/closings/${id}`),
-      api.get<Pkg[]>("/api/v1/packages?pageSize=100&status=WAITING_CLOSING"),
-    ]).then(([c, p]) => {
-      setClosing(c);
-      setEligible(
-        p.filter(
-          (item) => !c.closing_packages.some((cp) => cp.package_id === item.id),
-        ),
-      );
-    });
+  const load = useCallback(
+    () =>
+      Promise.all([
+        api.get<Closing>(`/api/v1/closings/${id}`),
+        api.get<Actor>("/api/v1/auth/me").catch(() => undefined),
+      ]).then(([closingValue, userValue]) => {
+        setClosing(closingValue);
+        setUser(userValue);
+      }),
+    [id],
+  );
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
-  async function add() {
-    await api.post(`/api/v1/closings/${id}/packages`, { packageIds: selected });
-    setSelected([]);
-    load();
+  const canCrosscheck = user?.role === "ADMIN" || user?.role === "STAFF_MERAUKE";
+  const canCancel = user?.role === "ADMIN";
+
+  const toggle = (packageId: string) =>
+    setSelected((current) =>
+      current.includes(packageId)
+        ? current.filter((item) => item !== packageId)
+        : [...current, packageId],
+    );
+
+  async function crosscheck() {
+    if (!selected.length) return;
+    setBusy(true);
+    setMessage(undefined);
+    try {
+      await api.post(`/api/v1/closings/${id}/merauke-check`, {
+        packageIds: selected,
+        condition,
+        notes,
+      });
+      setMessage({ kind: "ok", text: "Hasil cek Merauke tersimpan." });
+      setSelected([]);
+      setNotes("");
+      await load();
+    } catch (value) {
+      setMessage({
+        kind: "error",
+        text: value instanceof Error ? value.message : "Gagal menyimpan.",
+      });
+    } finally {
+      setBusy(false);
+    }
   }
 
-  async function action(name: string, body: unknown = {}) {
+  async function cancel() {
+    const reason = window.prompt("Alasan pembatalan:");
+    if (reason === null) return;
+    setBusy(true);
+    setMessage(undefined);
     try {
-      await api.post(`/api/v1/closings/${id}/${name}`, body);
-      setMessage("Tindakan berhasil.");
-      load();
+      await api.post(`/api/v1/closings/${id}/cancel`, { reason });
+      setMessage({ kind: "ok", text: "Closing dibatalkan." });
+      await load();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Tindakan gagal.");
+      setMessage({
+        kind: "error",
+        text: value instanceof Error ? value.message : "Gagal membatalkan.",
+      });
+    } finally {
+      setBusy(false);
     }
   }
 
   if (!closing) return <DetailPageSkeleton />;
+  const pendingPackages = closing.customer_groups
+    .flatMap((group) => group.packages)
+    .filter((item) => item.merauke_check_status === "PENDING");
+
   return (
     <>
       <div
@@ -70,13 +144,25 @@ export function ClosingDetail({ id }: { id: string }) {
           justifyContent: "space-between",
           alignItems: "start",
           gap: 16,
+          flexWrap: "wrap",
         }}
       >
         <div>
-          <h1>{closing.code}</h1>
-          <span className={statusTextClass(closing.status)}>{closing.status.replaceAll("_", " ")}</span>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <Link className="button ghost" href="/closings" style={{ padding: "6px 8px" }}>
+              ←
+            </Link>
+            <h1>{closing.code}</h1>
+            <span className={statusTextClass(closing.status)}>
+              {closing.status.replaceAll("_", " ")}
+            </span>
+          </div>
+          <p className="muted" style={{ marginTop: 4 }}>
+            {formatDate(closing.closing_date)} · {closing.merauke_progress} paket
+            dicek Merauke
+          </p>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <a
             className="button secondary"
             href={`/api/v1/closings/${id}/export?format=pdf`}
@@ -89,77 +175,145 @@ export function ClosingDetail({ id }: { id: string }) {
           >
             XLSX
           </a>
-          {closing.status === "DRAFT" && (
-            <button className="button" onClick={() => action("finalize")}>
-              Finalisasi
+          {canCancel && closing.status !== "COMPLETED" && (
+            <button className="button secondary" onClick={cancel} disabled={busy}>
+              Batalkan
             </button>
           )}
         </div>
       </div>
-      {message && <p>{message}</p>}
-      {closing.status === "DRAFT" && (
-        <div className="card" style={{ padding: 18, margin: "18px 0" }}>
-          <h3>Tambahkan Paket</h3>
-          <div style={{ maxHeight: 240, overflow: "auto" }}>
-            {eligible.map((pkg) => (
-              <label
-                key={pkg.id}
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  padding: 9,
-                  borderBottom: "1px solid var(--border)",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(pkg.id)}
-                  onChange={(e) =>
-                    setSelected(
-                      e.target.checked
-                        ? [...selected, pkg.id]
-                        : selected.filter((v) => v !== pkg.id),
-                    )
-                  }
-                />
-                {pkg.package_code} — {pkg.tracking_number} —{" "}
-                {pkg.customers?.name ?? "Tanpa customer"}
-              </label>
-            ))}
-          </div>
-          <button
-            className="button"
-            onClick={add}
-            disabled={!selected.length}
-            style={{ marginTop: 12 }}
-          >
-            Tambahkan Pilihan
-          </button>
+
+      {message && (
+        <div className={`feedback ${message.kind}`} style={{ margin: "14px 0" }}>
+          {message.text}
         </div>
       )}
-      <div className="card" style={{ overflow: "hidden", marginTop: 18 }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Paket</th>
-              <th>Resi</th>
-              <th>Customer</th>
-              <th>Biaya</th>
-            </tr>
-          </thead>
-          <tbody>
-            {closing.closing_packages.map((cp) => (
-              <tr key={cp.package_id}>
-                <td>{cp.packages.package_code}</td>
-                <td>{cp.packages.tracking_number}</td>
-                <td>{cp.packages.customers?.name}</td>
-                <td>{formatIdr(cp.packages.shipping_fee_idr)}</td>
+
+      {canCrosscheck && pendingPackages.length > 0 && (
+        <div className="card" style={{ padding: 18, margin: "18px 0" }}>
+          <h3>Crosscheck Merauke</h3>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Pilih paket pada daftar di bawah, lalu isi kondisi hasil pengecekan.
+          </p>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "wrap",
+              marginTop: 12,
+            }}
+          >
+            <select
+              className="input"
+              value={condition}
+              onChange={(event) => setCondition(event.target.value)}
+              style={{ width: 160 }}
+            >
+              <option value="OK">OK</option>
+              <option value="DAMAGED">Rusak</option>
+              <option value="MISSING">Hilang</option>
+            </select>
+            <input
+              className="input"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Catatan (opsional)"
+              style={{ flex: 1, minWidth: 200 }}
+            />
+            <button
+              className="button"
+              onClick={crosscheck}
+              disabled={!selected.length || busy}
+            >
+              Simpan ({selected.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {closing.customer_groups.map((group) => (
+        <div className="card" style={{ overflow: "hidden", marginTop: 18 }} key={group.key}>
+          <div
+            style={{
+              padding: "13px 18px",
+              borderBottom: "1px solid var(--border)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <strong style={{ fontSize: 14 }}>
+              {group.customer?.name ?? "Tanpa customer"}
+            </strong>
+            <span className="muted" style={{ fontSize: 13 }}>
+              {group.packages.length} paket
+            </span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                {canCrosscheck && <th style={{ width: 34 }} />}
+                <th>Paket</th>
+                <th>Resi</th>
+                <th>Biaya</th>
+                <th>Hasil Cek</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        <div style={{ padding: 18, textAlign: "right", fontWeight: 800 }}>
-          Total: {formatIdr(closing.total_amount_idr)}
+            </thead>
+            <tbody>
+              {group.packages.map((item) => (
+                <tr key={item.package_id}>
+                  {canCrosscheck && (
+                    <td>
+                      <input
+                        type="checkbox"
+                        disabled={
+                          item.merauke_check_status !== "PENDING" || busy
+                        }
+                        checked={selected.includes(item.package_id)}
+                        onChange={() => toggle(item.package_id)}
+                      />
+                    </td>
+                  )}
+                  <td>
+                    <Link
+                      href={`/packages/${item.packages.id}`}
+                      style={{ fontWeight: 600 }}
+                    >
+                      {item.packages.package_code}
+                    </Link>
+                  </td>
+                  <td>{item.packages.tracking_number}</td>
+                  <td>{formatIdr(item.packages.shipping_fee_idr)}</td>
+                  <td>
+                    <span
+                      className={
+                        CONDITION_CLASS[item.merauke_check_status ?? "PENDING"]
+                      }
+                    >
+                      {CONDITION_LABEL[item.merauke_check_status ?? "PENDING"]}
+                    </span>
+                    {item.merauke_notes && (
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {item.merauke_notes}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+
+      <div className="card" style={{ padding: 18, marginTop: 18 }}>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <strong>Total closing</strong>
+          <strong style={{ fontSize: 16 }}>
+            {formatIdr(closing.total_amount_idr)}
+          </strong>
         </div>
       </div>
     </>

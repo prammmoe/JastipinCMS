@@ -13,6 +13,8 @@ import { PACKAGE_STATUSES, packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
 import { CustomerGroups, type CustomerGroup } from "./customer-groups";
 import { CustomerFilter } from "./customer-filter";
+import { ClosingSelect } from "./closing-select";
+import type { Actor } from "@/types/domain";
 
 type PackageRow = {
   id: string;
@@ -93,6 +95,15 @@ export function PackagesPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState("");
+  const [selecting, setSelecting] = useState(false);
+  const [user, setUser] = useState<Actor>();
+
+  useEffect(() => {
+    api
+      .get<Actor>("/api/v1/auth/me")
+      .then(setUser)
+      .catch(() => {});
+  }, []);
 
   const { dateFrom, dateTo } = useMemo(() => {
     if (month) return monthRange(month);
@@ -165,7 +176,22 @@ export function PackagesPage() {
       <PageHeader
         title="Semua Barang"
         description="Cari, filter, dan urutkan seluruh paket."
+        actions={
+          user && (user.role === "ADMIN" || user.role === "STAFF_SIDOARJO") ? (
+            <button className="button" onClick={() => setSelecting((value) => !value)}>
+              {selecting ? "Kembali ke daftar" : "Buat Closing Surabaya"}
+            </button>
+          ) : undefined
+        }
       />
+      {selecting ? (
+        <ClosingSelect
+          search={search}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onExit={() => setSelecting(false)}
+        />
+      ) : (
       <div className="card" style={{ overflow: "hidden" }}>
         <div
           style={{
@@ -430,6 +456,7 @@ export function PackagesPage() {
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }

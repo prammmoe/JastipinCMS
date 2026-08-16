@@ -16,7 +16,7 @@ const loginSchema = z.object({ email: z.email(), password: z.string().min(1) });
 type RouteContext = { params: Promise<{ segments: string[] }> };
 
 function capability(segments: string[], method: string): Capability | null {
-  const [resource, , action] = segments;
+  const [resource, id, action] = segments;
   if (resource === "dashboard") return "dashboard:view";
   if (resource === "customers")
     return method === "GET" ? "dashboard:view" : "customers:manage";
@@ -29,7 +29,15 @@ function capability(segments: string[], method: string): Capability | null {
     return method === "GET" ? "packages:view" : "packages:edit";
   if (resource === "packages")
     return method === "PATCH" ? "packages:edit" : "packages:receive";
-  if (resource === "closings") return "closings:manage";
+  if (resource === "closings") {
+    if (method === "GET") return "closings:view";
+    if (method === "POST" && (!id || id === "save-surabaya"))
+      return "closings:create";
+    if (action === "merauke-check" || action === "merauke-exception")
+      return "closings:crosscheck";
+    return "closings:edit";
+  }
+  if (resource === "shipping-history") return "shipping-history:view";
   if (resource === "shipments")
     return action === "arrival-scan" || action === "reconcile"
       ? "packages:arrive"

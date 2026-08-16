@@ -23,7 +23,6 @@ import {
   uploadCloudinaryImage,
 } from "@/server/storage/cloudinary-storage";
 import {
-  closingSchema,
   customerHistorySchema,
   customerSchema,
   expenseSchema,
@@ -148,6 +147,8 @@ export class JastipinService {
     if (resource === "rate-configs") return this.rates(request, method, id);
     if (resource === "packages" && id === "export")
       return exportPackagesCsv(request);
+    if (resource === "packages" && id === "closing-eligible")
+      return this.closingEligible(request);
     if (resource === "packages")
       return this.packages(request, method, id, action, actor);
     if (resource === "unidentified") return this.unidentified(request);
@@ -158,6 +159,8 @@ export class JastipinService {
       );
     if (resource === "closings")
       return this.closings(request, method, id, action, subId, actor);
+    if (resource === "shipping-history")
+      return this.shippingHistory(request, method, id);
     if (resource === "shipments")
       return this.shipments(request, method, id, action, actor);
     if (resource === "invoices")
@@ -518,30 +521,34 @@ export class JastipinService {
         await this.client
           .from("packages")
           .select(
-            "*,customers(*),rate_configs(*),package_attachments(*),closing_packages(is_active,closings(status))",
+            "*,customers(*),rate_configs(*),package_attachments(*),closing_packages(is_active,merauke_check_status,closings(status))",
           )
           .eq("id", requireId(id))
           .single(),
       ) as Record<string, unknown>;
       const memberships = (data.closing_packages ?? []) as {
         is_active: boolean;
+        merauke_check_status: string | null;
         closings: { status: string } | null;
       }[];
-      const finalized = memberships.some(
-        (item) =>
-          item.is_active &&
-          item.closings &&
-          ["FINALIZED", "IN_SHIPMENT", "ARRIVED", "COMPLETED"].includes(
-            item.closings.status,
-          ),
-      );
-      const initialStatus = ["WAITING_CLOSING", "DAMAGED"].includes(
-        String(data.status),
-      );
+      const active = memberships.find((item) => item.is_active);
+      const closingLocked =
+        active?.closings &&
+        ["COMPLETED", "CANCELLED"].includes(active.closings.status);
+      const meraukeLocked = active
+        ? ["OK", "DAMAGED", "MISSING"].includes(
+            String(active.merauke_check_status ?? "PENDING"),
+          )
+        : false;
+      const canEdit =
+        actor.role === "ADMIN" ||
+        (actor.role === "STAFF_SIDOARJO" && !meraukeLocked);
       return ok({
         ...data,
         permissions: {
-          canEdit: actor.role === "ADMIN" && initialStatus && !finalized,
+          canEdit: canEdit && !closingLocked,
+          closingStatus: active?.closings?.status ?? null,
+          meraukeChecked: meraukeLocked,
         },
       });
     }
@@ -566,9 +573,17 @@ export class JastipinService {
       );
       const from = (p.page - 1) * p.pageSize;
       const to = p.page * p.pageSize - 1;
+      const activeMemberships = db(
+        await this.client
+          .from("closing_packages")
+          .select("package_id")
+          .eq("is_active", true),
+      ) as { package_id: string }[];
+      const activeIds = activeMemberships.map((item) => item.package_id);
       let query = this.client
         .from("packages")
         .select("*,customers(id,code,name)", { count: "exact" });
+      if (activeIds.length) query = query.not("id", "in", `(${activeIds.join(",")})`);
       if (p.search) {
         const term = clean(p.search);
         const orTerms = `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`;
@@ -584,6 +599,7 @@ export class JastipinService {
         );
       }
       if (p.status) query = query.eq("status", p.status);
+      else query = query.eq("status", "WAITING_CLOSING");
       if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
       if (p.dateTo) query = query.lte("received_date", p.dateTo);
       if (p.customerId) query = query.eq("customer_id", p.customerId);
@@ -783,34 +799,42 @@ export class JastipinService {
       );
     }
     if (method === "PATCH" && id) {
-      if (actor.role !== "ADMIN")
-        throw new AppError("AUTH_FORBIDDEN", "Hanya admin yang dapat mengedit paket.");
+      if (actor.role === "STAFF_MERAUKE")
+        throw new AppError(
+          "AUTH_FORBIDDEN",
+          "Staff Merauke tidak dapat mengedit paket.",
+        );
       const packageId = requireId(id);
       const current = db(
         await this.client
           .from("packages")
-          .select("*,package_attachments(*),closing_packages(is_active,closings(status))")
+          .select("*,package_attachments(*),closing_packages(is_active,merauke_check_status,closings(status))")
           .eq("id", packageId)
           .single(),
       ) as Record<string, unknown>;
       const memberships = (current.closing_packages ?? []) as {
         is_active: boolean;
+        merauke_check_status: string | null;
         closings: { status: string } | null;
       }[];
-      const locked =
-        !["WAITING_CLOSING", "DAMAGED"].includes(String(current.status)) ||
-        memberships.some(
-          (item) =>
-            item.is_active &&
-            item.closings &&
-            ["FINALIZED", "IN_SHIPMENT", "ARRIVED", "COMPLETED"].includes(
-              item.closings.status,
-            ),
-        );
-      if (locked)
+      const active = memberships.find((item) => item.is_active);
+      const closingLocked =
+        active?.closings &&
+        ["COMPLETED", "CANCELLED"].includes(active.closings.status);
+      const meraukeLocked = active
+        ? ["OK", "DAMAGED", "MISSING"].includes(
+            String(active.merauke_check_status ?? "PENDING"),
+          )
+        : false;
+      if (closingLocked)
         throw new AppError(
           "PACKAGE_EDIT_LOCKED",
-          "Paket tidak dapat diedit setelah closing difinalisasi.",
+          "Paket tidak dapat diedit setelah closing selesai.",
+        );
+      if (meraukeLocked)
+        throw new AppError(
+          "PACKAGE_EDIT_LOCKED",
+          "Paket tidak dapat diedit setelah dicek oleh Merauke.",
         );
 
       const form = await request.formData();
@@ -1006,6 +1030,106 @@ export class JastipinService {
     );
   }
 
+  private async closingEligible(request: NextRequest) {
+    const p = packageListSchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams),
+    );
+    const activeMemberships = db(
+      await this.client
+        .from("closing_packages")
+        .select("package_id")
+        .eq("is_active", true),
+    ) as { package_id: string }[];
+    const activeIds = activeMemberships.map((item) => item.package_id);
+    let query = this.client
+      .from("packages")
+      .select("*,customers(id,code,name)", { count: "exact" })
+      .eq("status", "WAITING_CLOSING")
+      .not("customer_id", "is", null);
+    if (activeIds.length) query = query.not("id", "in", `(${activeIds.join(",")})`);
+    if (p.search) {
+      const term = clean(p.search);
+      const orTerms = `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`;
+      const customerResult = await this.client
+        .from("customers")
+        .select("id")
+        .or(`name.ilike.%${term}%,code.ilike.%${term}%`);
+      const ids = (customerResult.data ?? []).map((row) => row.id);
+      query = query.or(
+        ids.length
+          ? `${orTerms},customer_id.in.(${ids.join(",")})`
+          : orTerms,
+      );
+    }
+    if (p.customerId) query = query.eq("customer_id", p.customerId);
+    if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
+    if (p.dateTo) query = query.lte("received_date", p.dateTo);
+    const result = await query
+      .order("received_date", { ascending: false })
+      .order("received_time", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true });
+    if (result.error) mapDatabaseError(result.error);
+    const all = (result.data ?? []) as Record<string, unknown>[];
+
+    const groupBy = request.nextUrl.searchParams.get("groupBy") ?? "package";
+    if (groupBy !== "customer") {
+      const from = (p.page - 1) * p.pageSize;
+      const to = p.page * p.pageSize - 1;
+      const rows = all.slice(from, to + 1);
+      return ok(rows, pageMeta(p.page, p.pageSize, all.length));
+    }
+
+    const groups = new Map<
+      string,
+      {
+        customer: { id: string; code: string; name: string } | null;
+        eligibleCount: number;
+        eligiblePackageIds: string[];
+        packages: typeof all;
+      }
+    >();
+    for (const row of all) {
+      const customer = (row.customers as {
+        id: string;
+        code: string;
+        name: string;
+      } | null);
+      const key = customer?.id ?? "__none__";
+      const existing = groups.get(key);
+      if (existing) {
+        existing.packages.push(row);
+        existing.eligiblePackageIds.push(String(row.id));
+      } else {
+        groups.set(key, {
+          customer,
+          eligibleCount: 1,
+          eligiblePackageIds: [String(row.id)],
+          packages: [row],
+        });
+      }
+    }
+    const sorted = [...groups.values()].sort((a, b) => {
+      if (p.sort === "name_asc" || p.sort === "name_desc") {
+        const left = a.customer?.name ?? "";
+        const right = b.customer?.name ?? "";
+        return p.sort === "name_asc"
+          ? left.localeCompare(right)
+          : right.localeCompare(left);
+      }
+      if (p.sort === "packages_desc")
+        return b.eligibleCount - a.eligibleCount;
+      const leftDate = a.packages[0]?.received_date ?? "";
+      const rightDate = b.packages[0]?.received_date ?? "";
+      return p.sort === "received_asc"
+        ? String(leftDate).localeCompare(String(rightDate))
+        : String(rightDate).localeCompare(String(leftDate));
+    });
+    const from = (p.page - 1) * p.pageSize;
+    const to = p.page * p.pageSize - 1;
+    const page = sorted.slice(from, to + 1);
+    return ok(page, pageMeta(p.page, p.pageSize, sorted.length));
+  }
+
   private async groupedPackages(request: NextRequest) {
     const p = packageListSchema.parse(
       Object.fromEntries(request.nextUrl.searchParams),
@@ -1104,73 +1228,13 @@ export class JastipinService {
         request.nextUrl.searchParams.get("format") ?? "pdf",
       );
     if (method === "GET" && id)
-      return ok(
-        db(
-          await this.client
-            .from("closings")
-            .select(
-              "*,closing_packages(*,packages(*,customers(*))),invoices(*)",
-            )
-            .eq("id", requireId(id))
-            .single(),
-        ),
-      );
+      return ok(await this.closingDetail(id));
     if (method === "GET")
-      return this.simpleList(request, "closings", undefined, "closing_date");
-    if (method === "POST" && !id) {
-      const input = closingSchema.parse(await body(request));
-      const data = db(
-        await this.client
-          .from("closings")
-          .insert({
-            code: await code(this.client, "CLOSING", "CLS", input.closingDate),
-            closing_date: input.closingDate,
-            notes: input.notes,
-            created_by: actor.id,
-          })
-          .select()
-          .single(),
-      );
-      return ok(data, undefined, { status: 201 });
-    }
-    if (method === "POST" && id && action === "packages") {
-      const input = await body(request);
-      const packageIds = (input.packageIds as unknown[]).map((value) =>
-        uuid.parse(value),
-      );
-      return ok(
-        db(
-          await this.client
-            .from("closing_packages")
-            .insert(
-              packageIds.map((packageId) => ({
-                closing_id: requireId(id),
-                package_id: packageId,
-              })),
-            )
-            .select(),
-        ),
-      );
-    }
-    if (method === "DELETE" && id && action === "packages" && subId) {
-      db(
-        await this.client
-          .from("closing_packages")
-          .delete()
-          .eq("closing_id", requireId(id))
-          .eq("package_id", requireId(subId)),
-      );
-      return ok({ deleted: true });
-    }
-    if (method === "POST" && id && action === "finalize")
-      return ok(
-        db(
-          await this.client.rpc("finalize_closing", {
-            p_closing_id: requireId(id),
-            p_actor_id: actor.id,
-          }),
-        ),
-      );
+      return this.closingList(request);
+    if (method === "POST" && id === "save-surabaya")
+      return this.saveSurabayaClosing(request, actor);
+    if (method === "POST" && id && action === "merauke-check")
+      return this.meraukeCheck(request, id, actor);
     if (method === "POST" && id && action === "cancel") {
       const reason = String((await body(request)).reason ?? "");
       return ok(
@@ -1183,23 +1247,202 @@ export class JastipinService {
         ),
       );
     }
-    if (method === "PATCH" && id) {
-      const input = closingSchema.partial().parse(await body(request));
-      return ok(
-        db(
-          await this.client
-            .from("closings")
-            .update({ closing_date: input.closingDate, notes: input.notes })
-            .eq("id", requireId(id))
-            .eq("status", "DRAFT")
-            .select()
-            .single(),
-        ),
-      );
-    }
     throw new AppError(
       "NOT_FOUND",
       "Operasi closing tidak ditemukan.",
+      undefined,
+      404,
+    );
+  }
+
+  private async closingList(request: NextRequest) {
+    const p = pagination(request);
+    let query = this.client
+      .from("closings")
+      .select(
+        "*,closing_packages(merauke_check_status,is_active)",
+        { count: "exact" },
+      )
+      .in("status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"]);
+    if (p.search)
+      query = query.ilike("code", `%${clean(p.search)}%`);
+    if (request.nextUrl.searchParams.get("from"))
+      query = query.gte("closing_date", request.nextUrl.searchParams.get("from")!);
+    if (request.nextUrl.searchParams.get("to"))
+      query = query.lte("closing_date", request.nextUrl.searchParams.get("to")!);
+    const result = await query
+      .order("closing_date", { ascending: false })
+      .range(p.from, p.to);
+    if (result.error) mapDatabaseError(result.error);
+    const rows = (result.data ?? []).map((closing) => {
+      const memberships = (closing.closing_packages ?? []) as {
+        merauke_check_status: string;
+        is_active: boolean;
+      }[];
+      const active = memberships.filter((item) => item.is_active);
+      const checked = active.filter(
+        (item) => item.merauke_check_status !== "PENDING",
+      ).length;
+      return {
+        ...closing,
+        customer_count: undefined,
+        merauke_progress: `${checked} / ${active.length}`,
+      };
+    });
+    return ok(rows, pageMeta(p.page, p.pageSize, result.count ?? 0));
+  }
+
+  private async closingDetail(id: string) {
+    const closing = db(
+      await this.client
+        .from("closings")
+        .select(
+          "*,closing_packages(*,packages(*,customers(*),package_attachments(*)))",
+        )
+        .eq("id", requireId(id))
+        .single(),
+    ) as Record<string, unknown>;
+    const memberships = (closing.closing_packages ?? []) as {
+      is_active: boolean;
+      merauke_check_status: string;
+      customer_id_snapshot: string | null;
+      packages: Record<string, unknown>;
+    }[];
+    const active = memberships.filter((item) => item.is_active);
+    const checked = active.filter(
+      (item) => item.merauke_check_status !== "PENDING",
+    ).length;
+    const groups = new Map<string, typeof active>();
+    for (const item of active) {
+      const customer = item.packages.customers as
+        | { id: string; code: string; name: string }
+        | null;
+      const key = customer?.id ?? item.customer_id_snapshot ?? "__none__";
+      const existing = groups.get(key);
+      if (existing) existing.push(item);
+      else groups.set(key, [item]);
+    }
+    return {
+      ...closing,
+      merauke_progress: `${checked} / ${active.length}`,
+      customer_groups: [...groups.entries()].map(([key, packages]) => ({
+        key,
+        customer:
+          (packages[0]?.packages.customers as {
+            id: string;
+            code: string;
+            name: string;
+          } | null) ?? null,
+        packages,
+      })),
+    };
+  }
+
+  private async saveSurabayaClosing(request: NextRequest, actor: Actor) {
+    const input = await body(request);
+    const closingDate = /^\d{4}-\d{2}-\d{2}$/.test(
+      String(input.closingDate ?? ""),
+    )
+      ? String(input.closingDate)
+      : new Date().toISOString().slice(0, 10);
+    const packageIds = (input.packageIds as unknown[])
+      .map((value) => uuid.safeParse(value))
+      .filter((result) => result.success)
+      .map((result) => result.data);
+    if (!packageIds.length)
+      throw new AppError("VALIDATION_ERROR", "Pilih minimal satu paket.");
+    const notes = String(input.notes ?? "");
+    return ok(
+      db(
+        await this.client.rpc("save_surabaya_closing", {
+          p_closing_date: closingDate,
+          p_package_ids: packageIds,
+          p_notes: notes,
+          p_actor_id: actor.id,
+        }),
+      ),
+      undefined,
+      { status: 201 },
+    );
+  }
+
+  private async meraukeCheck(request: NextRequest, id: string, actor: Actor) {
+    const input = await body(request);
+    const packageIds = (input.packageIds as unknown[])
+      .map((value) => uuid.safeParse(value))
+      .filter((result) => result.success)
+      .map((result) => result.data);
+    if (!packageIds.length)
+      throw new AppError("VALIDATION_ERROR", "Pilih minimal satu paket.");
+    const condition = ["OK", "DAMAGED", "MISSING"].includes(
+      String(input.condition),
+    )
+      ? String(input.condition)
+      : "OK";
+    return ok(
+      db(
+        await this.client.rpc("mark_closing_merauke", {
+          p_closing_id: requireId(id),
+          p_package_ids: packageIds,
+          p_condition: condition,
+          p_notes: String(input.notes ?? ""),
+          p_actor_id: actor.id,
+        }),
+      ),
+    );
+  }
+
+  private async shippingHistory(
+    request: NextRequest,
+    method: string,
+    id: string | undefined,
+  ) {
+    if (method === "GET" && id)
+      return ok(await this.closingDetail(id));
+    if (method === "GET") {
+      const p = pagination(request);
+      let query = this.client
+        .from("closings")
+        .select(
+          "*,closing_packages(merauke_check_status,is_active)",
+          { count: "exact" },
+        )
+        .eq("status", "COMPLETED");
+      if (p.search) query = query.ilike("code", `%${clean(p.search)}%`);
+      const month = request.nextUrl.searchParams.get("month");
+      if (month) {
+        const [year, num] = month.split("-").map(Number);
+        const lastDay = new Date(Date.UTC(year, num, 0)).getUTCDate();
+        query = query
+          .gte("closing_date", `${month}-01`)
+          .lte("closing_date", `${month}-${String(lastDay).padStart(2, "0")}`);
+      }
+      if (request.nextUrl.searchParams.get("from"))
+        query = query.gte("closing_date", request.nextUrl.searchParams.get("from")!);
+      if (request.nextUrl.searchParams.get("to"))
+        query = query.lte("closing_date", request.nextUrl.searchParams.get("to")!);
+      const result = await query
+        .order("closing_date", { ascending: false })
+        .range(p.from, p.to);
+      if (result.error) mapDatabaseError(result.error);
+      const rows = (result.data ?? []).map((closing) => {
+        const memberships = (closing.closing_packages ?? []) as {
+          merauke_check_status: string;
+          is_active: boolean;
+        }[];
+        const active = memberships.filter((item) => item.is_active);
+        return {
+          ...closing,
+          exception_count: active.filter((item) =>
+            ["DAMAGED", "MISSING"].includes(item.merauke_check_status),
+          ).length,
+        };
+      });
+      return ok(rows, pageMeta(p.page, p.pageSize, result.count ?? 0));
+    }
+    throw new AppError(
+      "NOT_FOUND",
+      "Operasi riwayat pengiriman tidak ditemukan.",
       undefined,
       404,
     );

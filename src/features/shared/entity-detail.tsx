@@ -45,25 +45,6 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
           <p className="muted">ID: {id}</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {section === "closings" && (
-            <>
-              <button className="button" onClick={() => action("finalize")}>
-                Finalisasi
-              </button>
-              <a
-                className="button secondary"
-                href={`/api/v1/closings/${id}/export?format=xlsx`}
-              >
-                XLSX
-              </a>
-              <a
-                className="button secondary"
-                href={`/api/v1/closings/${id}/export?format=pdf`}
-              >
-                PDF
-              </a>
-            </>
-          )}
           {section === "shipments" && (
             <>
               <button className="button" onClick={() => action("depart")}>

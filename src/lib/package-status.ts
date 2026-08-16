@@ -1,11 +1,11 @@
 import type { PackageStatus } from "@/types/domain";
 
 export const PACKAGE_STATUS_LABELS: Record<PackageStatus, string> = {
-  WAITING_CLOSING: "Diterima",
-  DAMAGED: "Diterima Rusak",
-  READY_TO_SHIP: "Siap Dikirim",
+  WAITING_CLOSING: "Belum Closing",
+  DAMAGED: "Rusak",
+  READY_TO_SHIP: "Closing Surabaya",
   IN_TRANSIT: "Dalam Pengiriman",
-  ARRIVED_MERAUKE: "Tiba di Merauke",
+  ARRIVED_MERAUKE: "Closing Merauke",
   READY_FOR_PICKUP: "Siap Diambil",
   COMPLETED: "Selesai",
   HOLD: "Ditahan",

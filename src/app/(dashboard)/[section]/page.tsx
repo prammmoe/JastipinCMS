@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation";
 import { ResourcePage,type ResourceConfig } from "@/features/shared/resource-page";
 import { PackagesPage } from "@/features/packages/packages-page";
+import { ClosingsPage } from "@/features/closings/closings-page";
+import { ShippingHistoryPage } from "@/features/shipping-history/shipping-history-page";
 
 const configs:Record<string,ResourceConfig>={
   packages:{title:"Semua Barang",description:"Cari dan pantau seluruh paket.",endpoint:"/api/v1/packages",columns:[["package_code","Kode"],["tracking_number","Nomor Resi"],["customers.name","Customer"],["status","Status"],["shipping_fee_idr","Biaya"],["received_date","Diterima"]],detailBase:"/packages"},
   customers:{title:"Customer",description:"Data customer dan riwayat pengiriman.",endpoint:"/api/v1/customers",columns:[["code","Kode"],["name","Nama"],["phone","Telepon"],["is_active","Aktif"]],fields:[{name:"name",label:"Nama",required:true},{name:"phone",label:"Telepon"},{name:"address",label:"Alamat"},{name:"notes",label:"Catatan"}],detailBase:"/customers"},
-  closings:{title:"Closing",description:"Kelompok paket dan invoice per customer.",endpoint:"/api/v1/closings",columns:[["code","Kode"],["closing_date","Tanggal"],["status","Status"],["package_count","Paket"],["total_amount_idr","Total"]],fields:[{name:"closingDate",label:"Tanggal",type:"date",required:true},{name:"notes",label:"Catatan"}],detailBase:"/closings"},
   shipments:{title:"Pengiriman",description:"Pengiriman laut dari Sidoarjo ke Merauke.",endpoint:"/api/v1/shipments",columns:[["code","Kode"],["vessel_name","Kapal"],["status","Status"],["departure_at","Berangkat"],["estimated_arrival_at","Estimasi Tiba"]],fields:[{name:"vesselName",label:"Nama Kapal"},{name:"estimatedArrivalAt",label:"Estimasi Tiba"},{name:"notes",label:"Catatan"}],detailBase:"/shipments"},
   arrivals:{title:"Kedatangan",description:"Pilih shipment untuk scan dan rekonsiliasi.",endpoint:"/api/v1/shipments",columns:[["code","Shipment"],["vessel_name","Kapal"],["status","Status"],["departure_at","Berangkat"]],detailBase:"/shipments"},
   pickups:{title:"Pengambilan",description:"Riwayat paket yang diserahkan kepada customer.",endpoint:"/api/v1/pickups",columns:[["picked_up_at","Waktu"],["customer_id","Customer"],["recipient_name","Penerima"]],detailBase:"/pickups"},
@@ -19,4 +20,4 @@ const configs:Record<string,ResourceConfig>={
   "reports-financial":{title:"Laporan Keuangan",description:"Revenue, penerimaan, piutang, biaya, dan recorded gross profit.",endpoint:"/api/v1/reports/financial",columns:[["revenueIdr","Revenue"],["collectedIdr","Diterima"],["outstandingIdr","Piutang"],["expensesIdr","Biaya"],["recordedGrossProfitIdr","Recorded Gross Profit"]]},
   settings:{title:"Settings",description:"Pengaturan bisnis tersimpan di database.",endpoint:"/api/v1/settings",columns:[["key","Konfigurasi"],["value","Nilai"],["updated_at","Diperbarui"]],fields:[{name:"key",label:"Key (A-Z, 0-9, _)",required:true},{name:"value",label:"Nilai",required:true}]},
 };
-export default async function SectionPage({params}:{params:Promise<{section:string}>}){const {section}=await params;if(section==="packages")return <PackagesPage/>;const config=configs[section];if(!config)notFound();return <ResourcePage config={config}/>}
+export default async function SectionPage({params}:{params:Promise<{section:string}>}){const {section}=await params;if(section==="packages")return <PackagesPage/>;if(section==="closings")return <ClosingsPage/>;if(section==="shipping-history")return <ShippingHistoryPage/>;const config=configs[section];if(!config)notFound();return <ResourcePage config={config}/>}
