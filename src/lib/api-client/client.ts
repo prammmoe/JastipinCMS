@@ -38,6 +38,9 @@ export const api = {
       headers,
     }),
   patch: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
+    request<T>(path, {
+      method: "PATCH",
+      body: body instanceof FormData ? body : JSON.stringify(body),
+    }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
 import { formatIdr } from "@/lib/formatters";
+
 type Pkg = {
   id: string;
   package_code: string;
@@ -10,6 +11,7 @@ type Pkg = {
   shipping_fee_idr: string;
   customers?: { name: string };
 };
+
 type Closing = {
   id: string;
   code: string;
@@ -17,11 +19,13 @@ type Closing = {
   total_amount_idr: string;
   closing_packages: { package_id: string; packages: Pkg }[];
 };
+
 export function ClosingDetail({ id }: { id: string }) {
   const [closing, setClosing] = useState<Closing>();
   const [eligible, setEligible] = useState<Pkg[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+
   const load = () =>
     Promise.all([
       api.get<Closing>(`/api/v1/closings/${id}`),
@@ -34,14 +38,17 @@ export function ClosingDetail({ id }: { id: string }) {
         ),
       );
     });
+
   useEffect(() => {
     load();
   }, [id]);
+
   async function add() {
     await api.post(`/api/v1/closings/${id}/packages`, { packageIds: selected });
     setSelected([]);
     load();
   }
+
   async function action(name: string, body: unknown = {}) {
     try {
       await api.post(`/api/v1/closings/${id}/${name}`, body);
@@ -51,6 +58,7 @@ export function ClosingDetail({ id }: { id: string }) {
       setMessage(value instanceof Error ? value.message : "Tindakan gagal.");
     }
   }
+
   if (!closing) return <p>Memuat...</p>;
   return (
     <>

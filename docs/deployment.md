@@ -41,10 +41,16 @@ Set variabel berikut pada target Preview menggunakan kredensial staging dan targ
 - `SUPABASE_URL`
 - `SUPABASE_PUBLISHABLE_KEY`
 - `SUPABASE_SECRET_KEY` (Sensitive)
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY` (Sensitive)
+- `CLOUDINARY_API_SECRET` (Sensitive)
 - `AUTH_ACCESS_COOKIE_NAME=jastipin_access`
 - `AUTH_REFRESH_COOKIE_NAME=jastipin_refresh`
 
 `APP_URL` harus sama persis dengan origin target karena mutation API memvalidasi header Origin.
+Cloudinary memakai signed-in server upload melalui API key dan secret; jangan pernah
+menambahkan `CLOUDINARY_API_SECRET` ke variabel `NEXT_PUBLIC_*`.
 
 Variabel tersebut sudah dipasang pada project Vercel. Saat memasukkannya ulang melalui CLI, gunakan `printf '%s' "$VALUE"`, bukan `echo`, agar tidak ada karakter newline yang ikut tersimpan. Production menggunakan legacy `service_role` pada variabel backend-only `SUPABASE_SECRET_KEY`; key `sb_secret_` tidak dapat ditampilkan ulang sebagai plaintext setelah dibuat. Jangan pernah mengekspos variabel ini ke browser.
 
@@ -58,12 +64,12 @@ Variabel tersebut sudah dipasang pada project Vercel. Saat memasukkannya ulang m
 
 Migrasi harus forward-compatible. Untuk perubahan destruktif, gunakan pola expand–migrate–contract dalam beberapa rilis.
 
-## Initial owner
+## Initial admin
 
-Bootstrap Owner dilakukan terpisah untuk setiap environment. Production sudah mempunyai satu Owner bootstrap. Untuk environment baru, muat seluruh variabel Supabase dan Owner target, lalu jalankan script tanpa menyimpan password ke Git:
+Bootstrap Admin dilakukan terpisah untuk setiap environment. Akun `OWNER` lama dimigrasikan menjadi `ADMIN`. Untuk environment baru, muat seluruh variabel Supabase dan Admin target, lalu jalankan script tanpa menyimpan password ke Git:
 
 ```bash
-pnpm tsx --env-file=.env.target scripts/bootstrap-owner.ts
+pnpm tsx --env-file=.env.target scripts/bootstrap-admin.ts
 ```
 
 ## Manual GitHub setup

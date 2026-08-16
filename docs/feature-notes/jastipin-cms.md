@@ -1,6 +1,56 @@
 # JASTIPin CMS Implementation Notes
 
-Branch: `main`
+Branch: `staging`
+
+## 2026-08-16 - Default unnamed packages to NONAME
+
+### Changed
+- Removed the Belum Diketahui surface from operational navigation, dashboard metrics, and operational reports.
+- Empty customer input during package intake now resolves to a shared `NONAME` customer, while entered and selected customer names keep their existing resolution behavior.
+- Updated the customer input hint and legacy package-detail empty option to avoid presenting Belum Diketahui as a workflow.
+
+### Stayed The Same
+- The legacy unidentified API remains available for existing records with no customer, and package intake continues to reuse normalized exact customer matches before creating a customer.
+
+### Verification
+- TypeScript, targeted ESLint, all 15 unit/architecture tests, `git diff --check`, and a source scan for remaining Belum Diketahui UI labels passed.
+
+## 2026-08-16 - Cloudinary intake photos and receiving condition
+
+### Changed
+- Barang Masuk now sends the created package UUID to the attachment endpoint, accepts at most two photos, and records either Diterima or Diterima Rusak as the initial package condition.
+- New photos upload from the backend to Cloudinary and keep their Cloudinary public ID plus file metadata in `package_attachments`; legacy Supabase Storage attachments remain readable and deletable.
+- Camera capture now requests the device's rear camera directly without user-agent detection, while gallery selection remains separate.
+- Added a database trigger migration that enforces a maximum of two attachments per package, including concurrent requests.
+
+### Stayed The Same
+- Package creation, duplicate tracking override, customer resolution, and access through the authenticated `/api/v1/files/:id` route remain unchanged.
+
+### Bugs And Fixes
+- Bug: Intake sent a human-readable package code where the upload API required a UUID, returning HTTP 400 after the package row had already been created.
+  Fix: Include `id` in the client response type and send `result.id` as `packageId`.
+- Bug: Multiple files were appended by the client but the backend read only the first file.
+  Fix: Validate and upload all submitted files, with Cloudinary cleanup when a later upload or database insert fails.
+- Bug: Camera capture depended on mobile user-agent detection and allowed multi-selection on the capture input.
+  Fix: Use an unconditional `capture="environment"` single-file camera input with `image/*` acceptance.
+
+### Verification
+- TypeScript strict checking, targeted ESLint, all 10 unit/architecture tests, and `git diff --check` passed.
+- Production build was attempted but could not be completed because Turbopack required an out-of-sandbox process/port permission that was declined.
+- Live Cloudinary upload was not run because local `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` are not configured; migration `202608160001` was not applied remotely.
+
+## 2026-08-16 - Free-text courier combobox
+
+### Changed
+- Replaced the plain Barang Masuk courier input with an accessible static combobox containing the 33 supplied courier names.
+- Courier suggestions filter while typing, support mouse and arrow-key selection, and canonicalize normalized exact matches such as `jne`, `j t`, and `ninja-xpress`.
+- Unmatched courier text remains valid and is submitted unchanged; the controlled field resets after a successful package save.
+
+### Stayed The Same
+- The API continues receiving the courier through the existing optional free-text `courier` field, so no database migration or contract change is required.
+
+### Verification
+- TypeScript, targeted ESLint, all 13 unit/architecture tests, and `git diff --check` passed.
 
 ## 2026-08-15 - Full internal CMS MVP
 
@@ -194,3 +244,38 @@ Branch: `main`
 
 ### Verification
 - Production resolves to `JASTIPin CMS`; Preview and local environments resolve to `JASTIPin CMS Staging` for metadata, login, and dashboard navigation.
+
+## 2026-08-16 - Package intake and admin package management
+
+### Changed
+- Replaced the legacy Owner/Finance role model with Admin and the two operational staff roles, including a fail-safe migration from `OWNER` to `ADMIN` and an Admin bootstrap script.
+- Made package intake a single multipart transaction with a required reception date, customer, tracking number, positive price and weight, status, and one to two Cloudinary photos; reception time remains optional and canonical `NULL`.
+- Added browser camera capture with a live preview and kept mobile file-capture as a fallback.
+- Added a dedicated package list with inclusive date and lifecycle-status filters plus stable date and fee sorting.
+- Rebuilt package detail as a read-only data view and authenticated photo gallery, with full inline editing available only when the API grants an eligible Admin permission.
+- Centralized Indonesian package status labels and removed standalone customer assignment, standalone photo upload, and visible status history from package detail.
+- Preserved legacy Supabase attachment delivery while routing new uploads and cleanup through Cloudinary.
+
+### Stayed The Same
+- Package status history remains stored for workflow and audit purposes.
+- `received_at` remains populated as a compatibility timestamp while `received_date` and nullable `received_time` are the canonical intake fields.
+- Legacy packages without a customer remain readable, but an Admin must supply a customer before saving an edit.
+
+### Bugs And Fixes
+- Bug: Desktop browsers treated the previous camera input as a regular file picker and opened Finder on macOS.
+  Fix: Use `getUserMedia` for an actual browser camera session, snapshot the preview to JPEG, and show a clear permission fallback.
+- Bug: A two-step create-then-upload flow could leave a package without required evidence.
+  Fix: Upload evidence before the package insert, compensate Cloudinary assets and newly created customers on failure, and enforce the one-to-two attachment invariant in both validation and the database.
+
+### Verification
+- ESLint with zero warnings, strict TypeScript, all 28 unit/architecture tests, `git diff --check`, and the Next.js production build completed successfully.
+- Local migration reset could not run because Docker Desktop was not running; migration files remain unapplied to remote environments and must follow the staging-first workflow.
+
+## 2026-08-16 - Keep legacy Owner sessions working during role migration
+
+### Bugs And Fixes
+- Bug: Existing sessions still resolved database role `OWNER` before migration `202608160002`, so permission lookup accessed an undefined matrix entry and every protected API returned HTTP 500.
+  Fix: Normalize legacy `OWNER` to `ADMIN` when resolving and creating sessions, reject unsupported roles explicitly, and make permission lookup fail closed instead of throwing.
+
+### Verification
+- ESLint with zero warnings, strict TypeScript, all 30 unit/architecture tests, and `git diff --check` completed successfully.

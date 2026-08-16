@@ -1,6 +1,7 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+
 type Customer = { id: string; code: string; name: string };
 type Pkg = {
   id: string;
@@ -8,11 +9,13 @@ type Pkg = {
   tracking_number: string;
   customer_id: string;
 };
+
 export function PickupPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [customer, setCustomer] = useState("");
   const [message, setMessage] = useState("");
+
   useEffect(() => {
     Promise.all([
       api.get<Customer[]>("/api/v1/customers?pageSize=100"),
@@ -22,6 +25,7 @@ export function PickupPage() {
       setPackages(p);
     });
   }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -43,7 +47,9 @@ export function PickupPage() {
       setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
     }
   }
+
   const available = packages.filter((p) => p.customer_id === customer);
+
   return (
     <>
       <h1>Pengambilan Paket</h1>

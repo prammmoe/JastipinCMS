@@ -10,11 +10,19 @@ type CustomerOption = {
   name: string;
 };
 
-export function CustomerCombobox() {
+export function CustomerCombobox({
+  required = false,
+  initialCustomer,
+}: {
+  required?: boolean;
+  initialCustomer?: CustomerOption | null;
+}) {
   const inputId = useId();
   const listboxId = useId();
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<CustomerOption | null>(null);
+  const [query, setQuery] = useState(initialCustomer?.name ?? "");
+  const [selected, setSelected] = useState<CustomerOption | null>(
+    initialCustomer ?? null,
+  );
   const [suggestions, setSuggestions] = useState<CustomerOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,15 +96,16 @@ export function CustomerCombobox() {
       }}
     >
       <label className="label" htmlFor={inputId}>
-        Customer
+        Customer{required ? " *" : ""}
       </label>
       <input
         id={inputId}
         className="input"
         name="customerName"
         value={query}
-        placeholder="Ketik nama customer"
+        placeholder="Kosongkan untuk NONAME"
         autoComplete="off"
+        required={required}
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listboxId}

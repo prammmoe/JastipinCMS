@@ -1,8 +1,16 @@
-export type InternalRole =
-  | "OWNER"
-  | "STAFF_SIDOARJO"
-  | "STAFF_MERAUKE"
-  | "FINANCE";
+export type InternalRole = "ADMIN" | "STAFF_SIDOARJO" | "STAFF_MERAUKE";
+const INTERNAL_ROLES: InternalRole[] = [
+  "ADMIN",
+  "STAFF_SIDOARJO",
+  "STAFF_MERAUKE",
+];
+
+export function normalizeInternalRole(role: string): InternalRole | null {
+  const normalized = role === "OWNER" ? "ADMIN" : role;
+  return INTERNAL_ROLES.includes(normalized as InternalRole)
+    ? (normalized as InternalRole)
+    : null;
+}
 export type PackageChargeType = "WEIGHT" | "VOLUMETRIC" | "FIXED" | "MANUAL";
 export type PackageStatus =
   | "WAITING_CLOSING"

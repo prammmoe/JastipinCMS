@@ -6,6 +6,7 @@ export type Capability =
   | "customers:manage"
   | "packages:view"
   | "packages:receive"
+  | "packages:edit"
   | "packages:arrive"
   | "closings:manage"
   | "shipments:manage"
@@ -16,11 +17,12 @@ export type Capability =
   | "reports:view"
   | "settings:manage";
 const matrix: Record<InternalRole, Capability[]> = {
-  OWNER: [
+  ADMIN: [
     "dashboard:view",
     "customers:manage",
     "packages:view",
     "packages:receive",
+    "packages:edit",
     "packages:arrive",
     "closings:manage",
     "shipments:manage",
@@ -51,16 +53,7 @@ const matrix: Record<InternalRole, Capability[]> = {
     "invoices:view",
     "reports:view",
   ],
-  FINANCE: [
-    "dashboard:view",
-    "customers:manage",
-    "packages:view",
-    "invoices:view",
-    "payments:manage",
-    "expenses:manage",
-    "reports:view",
-  ],
 };
 
 export const can = (role: InternalRole, capability: Capability) =>
-  matrix[role].includes(capability);
+  matrix[role]?.includes(capability) ?? false;

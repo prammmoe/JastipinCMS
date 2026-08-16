@@ -33,6 +33,7 @@
     "file-type": "^21.0.0",
     "lucide-react": "^0.539.0",
     "next": "16.2.11",
+    "next-cloudinary": "^6.18.8",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.62.0",

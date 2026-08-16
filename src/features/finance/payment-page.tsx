@@ -8,6 +8,7 @@ type Invoice = {
   balance_idr: string;
   status: string;
 };
+
 export function PaymentPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [message, setMessage] = useState("");
@@ -15,9 +16,11 @@ export function PaymentPage() {
     api
       .get<Invoice[]>("/api/v1/invoices?pageSize=100&status=UNPAID")
       .then(setInvoices);
+
   useEffect(() => {
     load();
   }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);

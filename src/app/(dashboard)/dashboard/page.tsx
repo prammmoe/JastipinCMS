@@ -7,7 +7,6 @@ import { formatIdr } from "@/lib/formatters";
 
 type Metrics = {
   receivedToday: number;
-  unidentified: number;
   waitingClosing: number;
   readyToShip: number;
   inTransit: number;
@@ -24,7 +23,6 @@ export default function Dashboard() {
 
   const cards = [
     "Paket diterima hari ini",
-    "Belum diketahui",
     "Menunggu closing",
     "Siap dikirim",
     "Dalam perjalanan",
@@ -34,14 +32,13 @@ export default function Dashboard() {
   const values = data
     ? [
         data.receivedToday,
-        data.unidentified,
         data.waitingClosing,
         data.readyToShip,
         data.inTransit,
         data.readyForPickup,
         formatIdr(data.outstandingIdr),
       ]
-    : Array(7).fill("—");
+    : Array(6).fill("—");
 
   return (
     <>

@@ -163,7 +163,7 @@ h3 { font-size: 15px; letter-spacing: -0.015em; font-weight: 600; }
 .input::placeholder { color: var(--neutral-400); }
 .input:focus { border-color: var(--pink-500); box-shadow: 0 0 0 3px var(--focus-ring); }
 .field-hint { margin-top: 6px; color: var(--neutral-500); font-size: 11px; line-height: 1.45; }
-.customer-combobox { position: relative; min-width: 0; }
+.customer-combobox, .courier-combobox { position: relative; min-width: 0; }
 .combobox-menu {
   position: absolute;
   z-index: 25;
@@ -177,6 +177,7 @@ h3 { font-size: 15px; letter-spacing: -0.015em; font-weight: 600; }
   box-shadow: 0 14px 32px rgba(10, 10, 10, 0.12);
   transform-origin: top center;
 }
+.courier-combobox .combobox-menu { max-height: 320px; overflow-y: auto; }
 .combobox-caption { padding: 9px 12px 6px; color: var(--neutral-500); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; }
 .combobox-option { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: transparent; padding: 10px 12px; color: var(--neutral-800); text-align: left; cursor: pointer; }
 .combobox-option strong, .combobox-option small { display: block; }
@@ -233,6 +234,93 @@ tbody tr { transition: background-color 120ms ease; }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
 .login-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.03em; }
 .login-subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+.image-uploader-previews {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.image-uploader-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.image-uploader-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.image-uploader-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.image-uploader-remove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+.package-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  margin: 10px 0 14px;
+}
+.package-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--neutral-100);
+}
+.package-photo img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.package-photo[data-removed="true"] img {
+  opacity: 0.25;
+  filter: grayscale(1);
+}
+.camera-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.78);
+}
+.camera-panel {
+  width: min(720px, 100%);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+.camera-panel video {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  background: #111;
+  object-fit: contain;
+}
 
 @media (hover: hover) and (pointer: fine) {
   .button:hover { background: var(--primary-hover); }

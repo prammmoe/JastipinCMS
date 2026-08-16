@@ -7,7 +7,6 @@ import {
   Archive,
   Boxes,
   ChartNoAxesCombined,
-  CircleHelp,
   CreditCard,
   HandCoins,
   LayoutDashboard,
@@ -33,7 +32,6 @@ const groups = [
     items: [
       ["/incoming", "Barang Masuk", PackagePlus],
       ["/packages", "Semua Barang", Boxes],
-      ["/unidentified", "Belum Diketahui", CircleHelp],
       ["/closings", "Closing", Archive],
       ["/shipments", "Pengiriman", Ship],
       ["/arrivals", "Kedatangan", ScanLine],
@@ -68,14 +66,6 @@ const groups = [
 ] as const;
 
 const restricted: Record<string, string[]> = {
-  FINANCE: [
-    "/incoming",
-    "/unidentified",
-    "/closings",
-    "/shipments",
-    "/arrivals",
-    "/pickups",
-  ],
   STAFF_SIDOARJO: [
     "/arrivals",
     "/pickups",

@@ -23,7 +23,6 @@ export function ReportPage({ type }: { type: "operational" | "financial" }) {
     packageCount: "Jumlah Paket",
     totalActualWeightKg: "Berat Aktual (kg)",
     totalChargeableWeightKg: "Berat Tagihan (kg)",
-    unidentified: "Belum Diketahui",
     revenueIdr: "Revenue",
     collectedIdr: "Pembayaran Diterima",
     outstandingIdr: "Piutang",

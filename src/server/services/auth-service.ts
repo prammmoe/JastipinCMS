@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { createAdminClient, createAuthClient } from "@/server/supabase/clients";
 import { AppError } from "@/server/errors/app-error";
+import { normalizeInternalRole } from "@/types/domain";
 
 export class AuthService {
   async login(email: string, password: string, ip: string) {
@@ -16,8 +17,9 @@ export class AuthService {
     }
     const { data: profile }=await admin.from("profiles").select("id,name,role,is_active").eq("id",result.data.user.id).maybeSingle();
     if (!profile?.is_active) { await auth.auth.signOut(); throw new AppError("AUTH_INVALID_CREDENTIALS","Email atau password salah."); }
+    const role = normalizeInternalRole(String(profile.role));
+    if (!role) { await auth.auth.signOut(); throw new AppError("AUTH_FORBIDDEN","Role pengguna belum didukung. Terapkan migration role terbaru."); }
     await admin.from("login_rate_limits").delete().eq("identifier_hash",hash);
-    return { profile, session: result.data.session };
+    return { profile: { ...profile, role }, session: result.data.session };
   }
 }
-

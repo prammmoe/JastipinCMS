@@ -3,7 +3,7 @@ import type { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, createAuthClient } from "@/server/supabase/clients";
 import { env } from "@/server/env";
 import { AppError } from "@/server/errors/app-error";
-import type { Actor } from "@/types/domain";
+import { normalizeInternalRole, type Actor } from "@/types/domain";
 
 export type ResolvedSession = {
   actor: Actor;
@@ -53,11 +53,17 @@ export class SessionService {
       throw new AppError("AUTH_FORBIDDEN", "Profil internal tidak ditemukan.");
     if (!profile.is_active)
       throw new AppError("AUTH_USER_DISABLED", "Akun dinonaktifkan.");
+    const role = normalizeInternalRole(String(profile.role));
+    if (!role)
+      throw new AppError(
+        "AUTH_FORBIDDEN",
+        "Role pengguna belum didukung. Terapkan migration role terbaru.",
+      );
     const actor = {
       id: profile.id,
       name: profile.name,
-      role: profile.role,
-    } as Actor;
+      role,
+    } satisfies Actor;
     return {
       actor,
       accessToken: rotated?.accessToken,

@@ -1,32 +1,24 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { PackagePlus } from "lucide-react";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
+import { CourierCombobox } from "@/components/ui/courier-combobox";
+import { ImageUploader, type ImageUploaderHandle } from "@/components/ui/image-uploader";
 import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 
-type Option = {
-  id: string;
-  name: string;
-  code?: string;
-  rate_per_kg_idr?: string;
-};
-
 export default function IncomingPage() {
   const tracking = useRef<HTMLInputElement>(null);
-  const [rates, setRates] = useState<Option[]>([]);
-  const [customerResetSignal, setCustomerResetSignal] = useState(0);
+  const imageUploaderRef = useRef<ImageUploaderHandle>(null);
+  const [formResetSignal, setFormResetSignal] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [duplicate, setDuplicate] = useState(false);
-
-  useEffect(() => {
-    api
-      .get<Option[]>("/api/v1/rate-configs?pageSize=100")
-      .then(setRates);
-  }, []);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -34,6 +26,10 @@ export default function IncomingPage() {
     setMessage("");
     const form = event.currentTarget;
     const data = new FormData(form);
+
+    const harga = data.get("harga");
+    const receivingCondition =
+      data.get("receivingCondition") === "DAMAGED" ? "DAMAGED" : "RECEIVED";
     const payload = {
       trackingNumber: data.get("trackingNumber"),
       customerId: data.get("customerId") || null,
@@ -43,23 +39,34 @@ export default function IncomingPage() {
       lengthCm: data.get("lengthCm") || null,
       widthCm: data.get("widthCm") || null,
       heightCm: data.get("heightCm") || null,
-      chargeType: data.get("chargeType"),
-      rateConfigId: data.get("rateConfigId") || null,
-      manualAmountIdr: data.get("manualAmountIdr") || null,
+      chargeType: "FIXED" as const,
+      manualAmountIdr: harga ? Number(harga) : null,
+      receivedDate: data.get("receivedDate"),
+      receivedTime: data.get("receivedTime") || null,
+      receivingCondition,
+      notes: data.get("catatan") || null,
       duplicateOverride: duplicate,
       duplicateOverrideReason: data.get("duplicateOverrideReason") || null,
-      overrideReason: data.get("overrideReason") || null,
-      notes: data.get("notes") || null,
     };
 
     try {
-      const result = await api.post<{ package_code: string }>(
+      const files = imageUploaderRef.current?.getFiles() ?? [];
+      if (files.length === 0) {
+        setError("Minimal satu foto bukti wajib diunggah.");
+        return;
+      }
+      const requestForm = new FormData();
+      requestForm.set("payload", JSON.stringify(payload));
+      for (const file of files) requestForm.append("file", file);
+      const result = await api.post<{ id: string; package_code: string }>(
         "/api/v1/packages",
-        payload,
+        requestForm,
       );
+
       setMessage(`${result.package_code} berhasil dicatat.`);
       form.reset();
-      setCustomerResetSignal((current) => current + 1);
+      imageUploaderRef.current?.clear();
+      setFormResetSignal((current) => current + 1);
       setDuplicate(false);
       tracking.current?.focus();
     } catch (value) {
@@ -105,7 +112,11 @@ export default function IncomingPage() {
 
         <div
           className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr 1fr 1fr",
+            gap: 16,
+          }}
         >
           <label>
             <span className="label">Nomor resi *</span>
@@ -118,11 +129,15 @@ export default function IncomingPage() {
               placeholder="Ketik lalu klik Enter"
             />
           </label>
+          <CourierCombobox key={`courier-${formResetSignal}`} />
           <label>
-            <span className="label">Kurir</span>
-            <input className="input" name="courier" placeholder="SPX, JNE, J&T" />
+            <span className="label">Status *</span>
+            <select className="input" name="receivingCondition" required>
+              <option value="RECEIVED">Diterima</option>
+              <option value="DAMAGED">Diterima Rusak</option>
+            </select>
           </label>
-          <CustomerCombobox key={customerResetSignal} />
+          <CustomerCombobox key={`customer-${formResetSignal}`} required />
         </div>
 
         <div style={{ height: 1, background: "var(--border)" }} />
@@ -132,8 +147,8 @@ export default function IncomingPage() {
           style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}
         >
           <label>
-            <span className="label">Berat aktual (kg)</span>
-            <input className="input" name="actualWeightKg" type="number" step="0.001" min="0" />
+            <span className="label">Berat aktual (kg) *</span>
+            <input className="input" name="actualWeightKg" type="number" step="0.001" min="0.001" required />
           </label>
           {["lengthCm", "widthCm", "heightCm"].map((name, index) => (
             <label key={name}>
@@ -147,46 +162,31 @@ export default function IncomingPage() {
 
         <div
           className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}
+          style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}
         >
           <label>
-            <span className="label">Jenis harga</span>
-            <select className="input" name="chargeType">
-              <option>WEIGHT</option>
-              <option>VOLUMETRIC</option>
-              <option>FIXED</option>
-              <option>MANUAL</option>
-            </select>
+            <span className="label">Harga *</span>
+            <input className="input" name="harga" type="number" min="1" placeholder="Nominal harga" required />
           </label>
           <label>
-            <span className="label">Tarif</span>
-            <select className="input" name="rateConfigId">
-              <option value="">Pilih bila berbasis berat</option>
-              {rates.map((rate) => (
-                <option key={rate.id} value={rate.id}>
-                  {rate.name}
-                </option>
-              ))}
-            </select>
+            <span className="label">Tanggal terima *</span>
+            <input className="input" name="receivedDate" type="date" defaultValue={today} required />
           </label>
           <label>
-            <span className="label">Nominal fixed/manual</span>
-            <input className="input" name="manualAmountIdr" type="number" min="0" />
-          </label>
-        </div>
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-        >
-          <label>
-            <span className="label">Alasan harga manual</span>
-            <input className="input" name="overrideReason" />
+            <span className="label">Waktu terima</span>
+            <input className="input" name="receivedTime" type="time" />
           </label>
           <label>
             <span className="label">Catatan</span>
-            <input className="input" name="notes" />
+            <input className="input" name="catatan" placeholder="Catatan tambahan" />
           </label>
+        </div>
+
+        <div style={{ height: 1, background: "var(--border)" }} />
+
+        <div>
+          <span className="label">Foto Bukti *</span>
+          <ImageUploader ref={imageUploaderRef} maxFiles={2} />
         </div>
 
         {duplicate && (

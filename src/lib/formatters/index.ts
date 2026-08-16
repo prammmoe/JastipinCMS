@@ -10,3 +10,11 @@ export const formatDateTime = (value: string | Date) =>
     timeStyle: "short",
     timeZone: "Asia/Jakarta",
   }).format(new Date(value));
+
+export function formatReceivedDate(date: string, time?: string | null) {
+  const formattedDate = new Intl.DateTimeFormat("id-ID", {
+    dateStyle: "medium",
+    timeZone: "Asia/Jakarta",
+  }).format(new Date(`${date}T00:00:00+07:00`));
+  return time ? `${formattedDate}, ${time.slice(0, 5)}` : formattedDate;
+}
