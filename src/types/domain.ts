@@ -1,3 +1,13 @@
+export type InternalRole = "ADMIN" | "STAFF_SIDOARJO" | "STAFF_MERAUKE";
+
+const INTERNAL_ROLES: readonly InternalRole[] = [
+  "ADMIN",
+  "STAFF_SIDOARJO",
+  "STAFF_MERAUKE",
+];
+
+export type PackageChargeType = "WEIGHT" | "VOLUMETRIC" | "FIXED" | "MANUAL";
+
 export type PackageStatus =
   | "WAITING_CLOSING"
   | "DAMAGED"
@@ -7,13 +17,15 @@ export type PackageStatus =
 export type Actor = {
   id: string;
   name: string;
-  role: string;
+  role: InternalRole;
 };
 
-export function normalizeInternalRole(role: string): string | null {
-  const lower = role.toUpperCase();
-  if (lower === "OWNER") return "ADMIN";
-  if (lower === "STAFF_SIDOARJO") return "STAFF_SIDOARJO";
-  if (lower === "FINANCE") return null;
-  return null;
+export function normalizeInternalRole(role: string): InternalRole | null {
+  if (!role) return null;
+  const upper = role.toUpperCase();
+  const normalized = upper === "OWNER" ? "ADMIN" : upper;
+  return INTERNAL_ROLES.includes(normalized as InternalRole)
+    ? (normalized as InternalRole)
+    : null;
 }
+

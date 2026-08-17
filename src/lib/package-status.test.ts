@@ -7,15 +7,10 @@ import {
 
 describe("package status labels", () => {
   it("maps intake statuses to operational labels", () => {
-    expect(packageStatusLabel("WAITING_CLOSING")).toBe("Belum Closing");
+    expect(packageStatusLabel("WAITING_CLOSING")).toBe("Diterima");
+    expect(packageStatusLabel("DAMAGED")).toBe("Diterima Rusak");
     expect(packageStatusLabel("READY_TO_SHIP")).toBe("Closing Surabaya");
-    expect(packageStatusLabel("IN_TRANSIT")).toBe("Dalam Pengiriman");
     expect(packageStatusLabel("ARRIVED_MERAUKE")).toBe("Closing Merauke");
-    expect(packageStatusLabel("READY_FOR_PICKUP")).toBe("Siap Diambil");
-    expect(packageStatusLabel("COMPLETED")).toBe("Selesai");
-    expect(packageStatusLabel("DAMAGED")).toBe("Rusak");
-    expect(packageStatusLabel("MISSING")).toBe("Hilang");
-    expect(packageStatusLabel("HOLD")).toBe("Ditahan");
   });
 
   it("groups the package list into four business statuses", () => {
@@ -26,7 +21,8 @@ describe("package status labels", () => {
       "Closing Merauke",
     ]);
     expect(packageListStatusLabel("WAITING_CLOSING")).toBe("Diterima");
-    expect(packageListStatusLabel("IN_TRANSIT")).toBe("Closing Surabaya");
-    expect(packageListStatusLabel("COMPLETED")).toBe("Closing Merauke");
+    expect(packageListStatusLabel("DAMAGED")).toBe("Diterima Rusak");
+    expect(packageListStatusLabel("READY_TO_SHIP")).toBe("Closing Surabaya");
+    expect(packageListStatusLabel("ARRIVED_MERAUKE")).toBe("Closing Merauke");
   });
 });

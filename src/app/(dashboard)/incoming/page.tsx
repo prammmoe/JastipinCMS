@@ -6,16 +6,19 @@ import {
   ImageUploader,
   type ImageUploaderHandle,
 } from "@/components/ui/image-uploader";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
+import { ApiClientError } from "@/lib/api-client/errors";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate, formatIdr } from "@/lib/formatters";
 import { packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
+
+import { normalizePhoneNumber } from "@/server/domain/customers/normalize-phone-number";
 
 export default function IncomingPage() {
   const snackbar = useSnackbar();
@@ -34,6 +37,15 @@ export default function IncomingPage() {
     const form = event.currentTarget;
     const data = new FormData(form);
 
+    const rawPhone = data.get("customerPhone")
+      ? String(data.get("customerPhone")).trim()
+      : "";
+    if (rawPhone && !normalizePhoneNumber(rawPhone)) {
+      snackbar.error("Nomor telepon harus diawali dengan 08 atau +62.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const harga = data.get("harga");
     const receivingCondition =
       data.get("receivingCondition") === "DAMAGED" ? "DAMAGED" : "RECEIVED";
@@ -41,6 +53,7 @@ export default function IncomingPage() {
       trackingNumber: data.get("trackingNumber"),
       customerId: data.get("customerId") || null,
       customerName: data.get("customerName") || null,
+      customerPhone: rawPhone || null,
       courier: data.get("courier") || null,
       actualWeightKg: data.get("actualWeightKg") || null,
       lengthCm: data.get("lengthCm") || null,
@@ -103,6 +116,15 @@ export default function IncomingPage() {
             />
           </label>
           <CustomerCombobox key={`customer-${formResetSignal}`} required />
+          <label>
+            <span className="label">Nomor telepon customer</span>
+            <input
+              className="input"
+              name="customerPhone"
+              type="tel"
+              placeholder="Contoh: 081234567890 atau +6281234567890"
+            />
+          </label>
           <CourierCombobox key={`courier-${formResetSignal}`} />
           <label>
             <span className="label">Status *</span>
@@ -147,32 +169,132 @@ export default function IncomingPage() {
               required
             />
           </label>
-          <label>
-            <span className="label">Detail Paket</span>
-            <details
-              open={isExpanded}
-              onToggle={() => setIsExpanded(!isExpanded)}
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <details
+            open={isExpanded}
+            onToggle={(e) =>
+              setIsExpanded((e.target as HTMLDetailsElement).open)
+            }
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--surface-subtle)",
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "12px 16px",
+                fontWeight: 600,
+                fontSize: 13,
+                color: "var(--neutral-800)",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
             >
-              <div style={{ display: "grid", gridTemplateColumns: "120px 80px 40px 90px", gap: "8px", padding: "8px 12px", background: "var(--background)", borderRadius: "8px", border: "1px solid var(--border)", marginTop: "8px" }}>
-                <div style={{ gridColumn: "1 / 3" }}>
-                  <span className="label">Panjang (cm)</span>
-                  <input className="input" name="lengthCm" type="number" min="0.01" step="0.01" />
-                </div>
-                <span style={{ gridColumn: "3", textAlign: "center" }}>cm</span>
-                <span style={{ gridColumn: "2 / 4", textAlign: "right" }}>
-                  <span className="label">Lebar (cm)</span>
-                  <input className="input" name="widthCm" type="number" min="0.01" step="0.01" />
+              Detail Paket (Dimensi &amp; Catatan Opsional)
+            </summary>
+            <div
+              style={{
+                padding: "16px",
+                borderTop: "1px solid var(--border)",
+                background: "var(--surface)",
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              <div>
+                <span
+                  className="label"
+                  style={{ marginBottom: 8, color: "var(--neutral-600)" }}
+                >
+                  Dimensi Paket (P × L × T dalam cm)
                 </span>
-                <span style={{ gridColumn: "4", textAlign: "center" }}>cm</span>
-                <span className="label" style={{ gridColumn: "1 / 4" }}>Tinggi (cm)</span>
-                <input className="input" name="heightCm" type="number" min="0.01" step="0.01" />
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Panjang (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="lengthCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Lebar (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="widthCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Tinggi (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="heightCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
               </div>
-              <div style={{ marginTop: "8px", display: "grid", gridTemplateColumns: "1fr", gap: "8px", padding: "8px 12px", background: "var(--background)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
                 <span className="label">Catatan</span>
-                <textarea className="input" name="catatan" placeholder="Catatan tambahan" rows={3} />
-              </div>
-            </details>
-          </label>
+                <textarea
+                  className="input"
+                  name="catatan"
+                  placeholder="Catatan tambahan paket (opsional)"
+                  rows={3}
+                  style={{ resize: "vertical", minHeight: 70 }}
+                />
+              </label>
+            </div>
+          </details>
         </div>
         <div style={{ marginTop: 18 }}>
           <span className="label">Bukti foto * (total 1–2)</span>

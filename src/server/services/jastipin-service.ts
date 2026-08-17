@@ -12,6 +12,7 @@ import {
   customerDisplayName,
   normalizeCustomerName,
 } from "@/server/domain/customers/normalize-customer-name";
+import { normalizePhoneNumber } from "@/server/domain/customers/normalize-phone-number";
 import { normalizeTrackingNumber } from "@/server/domain/tracking/normalize-tracking-number";
 import { updateInternalUser } from "@/server/services/update-internal-user";
 import { changePassword } from "@/server/services/change-password";
@@ -524,6 +525,7 @@ export class JastipinService {
     customerName?: string | null,
     customerPhone?: string | null,
   ) {
+    const phone = normalizePhoneNumber(customerPhone);
     if (customerId) {
       const selected = await this.client
         .from("customers")
@@ -538,11 +540,11 @@ export class JastipinService {
           "CUSTOMER_INACTIVE",
           "Customer yang dipilih sudah nonaktif.",
         );
-      if (customerPhone)
+      if (phone)
         db(
           await this.client
             .from("customers")
-            .update({ phone: customerPhone })
+            .update({ phone })
             .eq("id", customerId),
         );
       return { id: String(selected.data.id), created: false };
@@ -562,11 +564,11 @@ export class JastipinService {
           "CUSTOMER_INACTIVE",
           "Customer dengan nama ini sudah ada tetapi sedang nonaktif.",
         );
-      if (customerPhone)
+      if (phone)
         db(
           await this.client
             .from("customers")
-            .update({ phone: customerPhone })
+            .update({ phone })
             .eq("id", existing.data.id),
         );
       return { id: String(existing.data.id), created: false };
@@ -577,7 +579,7 @@ export class JastipinService {
       .insert({
         code: await code(this.client, "CUSTOMER", "CUS"),
         name: displayName,
-        phone: customerPhone,
+        phone,
       })
       .select("id,is_active")
       .single();
@@ -589,11 +591,11 @@ export class JastipinService {
         .maybeSingle();
       if (concurrent.error) mapDatabaseError(concurrent.error);
       if (concurrent.data?.is_active) {
-        if (customerPhone)
+        if (phone)
           db(
             await this.client
               .from("customers")
-              .update({ phone: customerPhone })
+              .update({ phone })
               .eq("id", concurrent.data.id),
           );
         return { id: String(concurrent.data.id), created: false };

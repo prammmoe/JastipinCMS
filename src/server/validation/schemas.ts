@@ -1,10 +1,32 @@
 import { z } from "zod";
+import { normalizePhoneNumber } from "@/server/domain/customers/normalize-phone-number";
+
 const optionalText = z.string().trim().max(1000).nullish();
 export const uuid = z.uuid();
+export const phoneSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .optional()
+  .nullable()
+  .transform((val, ctx) => {
+    if (val === undefined) return undefined;
+    if (val === null || val === "") return null;
+    const normalized = normalizePhoneNumber(val);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Nomor telepon harus diawali dengan 08 atau +62.",
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
+
 export const paginationSchema = z.object({ page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(200).default(50), search: z.string().trim().max(100).default(""), status: z.string().max(50).optional(), sort: z.string().max(50).optional() });
-export const customerSchema = z.object({ name: z.string().trim().min(1).max(160), phone: z.string().trim().max(30).nullish(), address: optionalText, notes: optionalText, isActive: z.boolean().optional() });
+export const customerSchema = z.object({ name: z.string().trim().min(1).max(160), phone: phoneSchema, address: optionalText, notes: optionalText, isActive: z.boolean().optional() });
 export const rateSchema = z.object({ name:z.string().trim().min(1).max(160),ratePerKgIdr:z.coerce.number().int().min(0).nullish(),minimumChargeIdr:z.coerce.number().int().min(0).nullish(),volumetricDivisor:z.coerce.number().positive().nullish(),roundingStepKg:z.coerce.number().positive().nullish(),validFrom:z.iso.date().nullish(),validUntil:z.iso.date().nullish(),isActive:z.boolean().default(true),notes:optionalText });
-export const packageSchema = z.object({ customerId:z.uuid().nullish(),customerName:z.string().trim().max(160).nullish(),customerPhone:z.string().trim().max(30).nullish(),trackingNumber:z.string().trim().min(1).max(120),courier:z.string().trim().max(80).nullish(),receivedAt:z.iso.datetime().optional(),actualWeightKg:z.coerce.number().positive().nullish(),lengthCm:z.coerce.number().positive().nullish(),widthCm:z.coerce.number().positive().nullish(),heightCm:z.coerce.number().positive().nullish(),chargeType:z.enum(["WEIGHT","VOLUMETRIC","FIXED","MANUAL"]),rateConfigId:z.uuid().nullish(),manualAmountIdr:z.coerce.number().int().min(0).nullish(),overrideReason:z.string().trim().max(500).nullish(),storageLocation:z.string().trim().max(100).nullish(),receivingCondition:z.enum(["RECEIVED","DAMAGED"]).default("RECEIVED"),notes:optionalText });
+export const packageSchema = z.object({ customerId:z.uuid().nullish(),customerName:z.string().trim().max(160).nullish(),customerPhone:phoneSchema,trackingNumber:z.string().trim().min(1).max(120),courier:z.string().trim().max(80).nullish(),receivedAt:z.iso.datetime().optional(),actualWeightKg:z.coerce.number().positive().nullish(),lengthCm:z.coerce.number().positive().nullish(),widthCm:z.coerce.number().positive().nullish(),heightCm:z.coerce.number().positive().nullish(),chargeType:z.enum(["WEIGHT","VOLUMETRIC","FIXED","MANUAL"]),rateConfigId:z.uuid().nullish(),manualAmountIdr:z.coerce.number().int().min(0).nullish(),overrideReason:z.string().trim().max(500).nullish(),storageLocation:z.string().trim().max(100).nullish(),receivingCondition:z.enum(["RECEIVED","DAMAGED"]).default("RECEIVED"),notes:optionalText });
 const receivedTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullish();
 export const packageIntakeSchema = packageSchema.extend({
   customerName:z.string().trim().max(160).nullish(),receivedDate:z.iso.date(),receivedTime:receivedTimeSchema,

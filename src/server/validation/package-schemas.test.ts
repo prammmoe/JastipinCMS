@@ -34,15 +34,22 @@ describe("packageIntakeSchema", () => {
     expect(packageIntakeSchema.parse({ ...validIntake, receivedTime: "14:35" }).receivedTime).toBe("14:35");
   });
 
-  it("accepts an optional customer phone number", () => {
+  it("accepts and normalizes an optional customer phone number", () => {
+    expect(
+      packageIntakeSchema.parse({ ...validIntake, customerPhone: "+6281247016022" })
+        .customerPhone,
+    ).toBe("081247016022");
     expect(
       packageIntakeSchema.parse({ ...validIntake, customerPhone: "0812 3456 7890" })
         .customerPhone,
-    ).toBe("0812 3456 7890");
+    ).toBe("081234567890");
     expect(packageIntakeSchema.parse(validIntake).customerPhone).toBeUndefined();
   });
 
-  it("rejects a customer phone number longer than 30 characters", () => {
+  it("rejects invalid customer phone numbers", () => {
+    expect(() =>
+      packageIntakeSchema.parse({ ...validIntake, customerPhone: "sddsodsidsk" }),
+    ).toThrow("Nomor telepon harus diawali dengan 08 atau +62.");
     expect(() =>
       packageIntakeSchema.parse({ ...validIntake, customerPhone: "1".repeat(31) }),
     ).toThrow();
