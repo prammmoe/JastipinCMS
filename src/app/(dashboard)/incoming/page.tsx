@@ -6,18 +6,11 @@ import {
   ImageUploader,
   type ImageUploaderHandle,
 } from "@/components/ui/image-uploader";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRef, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 import { useSnackbar } from "@/components/ui/snackbar";
-import { formatDate, formatIdr } from "@/lib/formatters";
-import { packageStatusLabel } from "@/lib/package-status";
-import { statusTextClass } from "@/lib/status-text";
-
 import { normalizePhoneNumber } from "@/server/domain/customers/normalize-phone-number";
 
 export default function IncomingPage() {
