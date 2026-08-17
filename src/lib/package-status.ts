@@ -19,3 +19,11 @@ export const PACKAGE_STATUSES = Object.keys(
 export function packageStatusLabel(status: string) {
   return PACKAGE_STATUS_LABELS[status as PackageStatus] ?? status.replaceAll("_", " ");
 }
+
+export function packageReceivedLabel(status: string) {
+  return status === "DAMAGED" ? "Diterima Rusak" : "Diterima";
+}
+
+export function packageReceivedClass(status: string) {
+  return status === "DAMAGED" ? "status-text warning" : "status-text success";
+}

@@ -10,20 +10,13 @@ export type ActiveClosing = {
 };
 
 export type DashboardSummary = {
-  receivedToday: number;
+  totalReceived: number;
   waitingClosing: number;
-  waitingMerauke: number;
-  meraukeCompletedToday: number;
-  attentionCount: number;
+  meraukeApproved: number;
 };
 
 export type DashboardData = {
   summary: DashboardSummary;
-  attention: { damaged: number; missing: number; hold: number };
-  aging: {
-    waitingClosingOverThreshold: number;
-    waitingMeraukeOverThreshold: number;
-  };
   activeClosings: ActiveClosing[];
   incomingTrend: { date: string; count: number }[];
 };

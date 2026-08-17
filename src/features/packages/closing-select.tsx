@@ -58,7 +58,7 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
       .getPaged<EligibleGroup[]>(`/api/v1/packages/closing-eligible?${query}`)
       .then(({ data, meta }) => {
         setGroups(data);
-        setTotal(meta?.total ?? 0);
+        setTotal(meta?.totalPackages ?? meta?.total ?? 0);
       })
       .catch((value) =>
         snackbar.error(
@@ -129,7 +129,7 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
           gap: 10,
           flexWrap: "wrap",
           borderBottom: "1px solid var(--border)",
-          background: "var(--accent-muted)",
+          background: "var(--neutral-100)",
         }}
       >
         <div>

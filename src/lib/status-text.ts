@@ -1,6 +1,7 @@
 const SUCCESS = new Set([
   "COMPLETED",
   "READY_FOR_PICKUP",
+  "READY_TO_SHIP",
   "ARRIVED_MERAUKE",
   "ARRIVED",
   "RECONCILED",

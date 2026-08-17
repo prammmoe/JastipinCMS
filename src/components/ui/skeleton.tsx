@@ -161,29 +161,16 @@ export function DashboardSkeleton() {
           gap: 14,
         }}
       >
-        {Array.from({ length: 5 }, (_, index) => (
+        {Array.from({ length: 3 }, (_, index) => (
           <div className="card" key={index} style={{ padding: 20 }}>
             <Skeleton style={{ height: 12, width: "70%" }} />
             <Skeleton style={{ height: 28, width: "45%", marginTop: 12 }} />
           </div>
         ))}
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))",
-          gap: 16,
-          marginTop: 16,
-        }}
-      >
-        {Array.from({ length: 2 }, (_, index) => (
-          <div className="card" key={index} style={{ padding: 20 }}>
-            <Skeleton style={{ height: 16, width: 140, marginBottom: 16 }} />
-            <Skeleton style={{ height: 14, width: "86%", marginBottom: 10 }} />
-            <Skeleton style={{ height: 14, width: "70%", marginBottom: 10 }} />
-            <Skeleton style={{ height: 14, width: "58%" }} />
-          </div>
-        ))}
+      <div className="card" style={{ padding: 20, marginTop: 16 }}>
+        <Skeleton style={{ height: 16, width: 180, marginBottom: 20 }} />
+        <Skeleton style={{ height: 180, width: "100%" }} />
       </div>
       <div className="card" style={{ padding: 20, marginTop: 16 }}>
         <Skeleton style={{ height: 16, width: 180, marginBottom: 20 }} />

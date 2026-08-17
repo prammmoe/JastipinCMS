@@ -11,9 +11,9 @@ export function DashboardSummary({
   return (
     <div className="dashboard-summary-grid">
       <DashboardStatCard
-        label="Barang masuk hari ini"
-        value={summary.receivedToday}
-        href="/packages?preset=today"
+        label="Total Barang Masuk"
+        value={summary.totalReceived}
+        href="/packages"
       />
       <DashboardStatCard
         label="Belum closing"
@@ -21,20 +21,9 @@ export function DashboardSummary({
         href="/packages"
       />
       <DashboardStatCard
-        label="Menunggu ACC Merauke"
-        value={summary.waitingMerauke}
-        href="/closings"
-      />
-      <DashboardStatCard
-        label="Closing Merauke hari ini"
-        value={summary.meraukeCompletedToday}
-        hint="barang tervalidasi"
-      />
-      <DashboardStatCard
-        label="Perlu perhatian"
-        value={summary.attentionCount}
-        href="/packages?attention=true"
-        tone={summary.attentionCount > 0 ? "danger" : "default"}
+        label="Total Closing"
+        value={summary.meraukeApproved}
+        href="/shipping-history"
       />
     </div>
   );

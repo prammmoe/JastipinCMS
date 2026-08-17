@@ -7,8 +7,6 @@ import { useSnackbar } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
 import type { DashboardData } from "@/types/dashboard";
 import { ActiveClosings } from "./active-closings";
-import { AgingSummary } from "./aging-summary";
-import { AttentionSummary } from "./attention-summary";
 import { DashboardSummary } from "./dashboard-summary";
 import { IncomingTrendChart } from "./incoming-trend-chart";
 
@@ -41,19 +39,12 @@ export default function DashboardPage() {
 
   return (
     <>
-      <PageHeader
-        title="Dashboard"
-        description="Ringkasan operasional JASTIPin hari ini."
-      />
+      <PageHeader title="Dashboard" />
       {loading ? (
         <DashboardSkeleton />
       ) : data ? (
         <>
           <DashboardSummary summary={data.summary} />
-          <div className="dashboard-sections">
-            <AttentionSummary attention={data.attention} />
-            <AgingSummary aging={data.aging} />
-          </div>
           <div style={{ marginTop: 16 }}>
             <ActiveClosings closings={data.activeClosings} />
           </div>

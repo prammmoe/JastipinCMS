@@ -59,6 +59,7 @@ export type PagedResult<T> = {
     pageSize: number;
     total: number;
     totalPages: number;
+    totalPackages?: number;
   };
 };
 export const api = {

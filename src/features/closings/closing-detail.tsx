@@ -6,7 +6,11 @@ import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate, formatIdr } from "@/lib/formatters";
-import { statusTextClass } from "@/lib/status-text";
+import {
+  closingCheckedCount,
+  closingStatusClass,
+  closingStatusLabel,
+} from "@/lib/closing-status";
 import type { Actor } from "@/types/domain";
 
 type PackageRow = {
@@ -62,6 +66,11 @@ export function ClosingDetail({ id }: { id: string }) {
   const [condition, setCondition] = useState("OK");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [xlsxBusy, setXlsxBusy] = useState(false);
 
   const load = useCallback(
     () =>
@@ -111,20 +120,69 @@ export function ClosingDetail({ id }: { id: string }) {
     }
   }
 
-  async function cancel() {
-    const reason = window.prompt("Alasan pembatalan:");
-    if (reason === null) return;
-    setBusy(true);
+  function openCancel() {
+    setCancelReason("");
+    setConfirmCancel(true);
+  }
+
+  async function downloadExport(format: "pdf" | "xlsx") {
+    const setBusyFlag = format === "pdf" ? setPdfBusy : setXlsxBusy;
+    setBusyFlag(true);
     try {
-      await api.post(`/api/v1/closings/${id}/cancel`, { reason });
+      const response = await fetch(
+        `/api/v1/closings/${id}/export?format=${format}`,
+        { credentials: "same-origin" },
+      );
+      if (!response.ok) {
+        let message = "Gagal membuat file.";
+        try {
+          const payload = await response.json();
+          message = payload.error?.message ?? message;
+        } catch {
+          // non-JSON error body
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition");
+      const filename =
+        disposition?.match(/filename="?([^"]+)"?/i)?.[1] ?? "download";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (value) {
+      snackbar.error(
+        value instanceof Error
+          ? value.message
+          : format === "pdf"
+            ? "Gagal membuat PDF. Silakan coba lagi."
+            : "Gagal membuat Excel. Silakan coba lagi.",
+      );
+    } finally {
+      setBusyFlag(false);
+    }
+  }
+
+  async function submitCancel() {
+    setCancelBusy(true);
+    try {
+      await api.post(`/api/v1/closings/${id}/cancel`, {
+        reason: cancelReason,
+      });
       snackbar.success("Closing dibatalkan.");
+      setConfirmCancel(false);
       await load();
     } catch (value) {
       snackbar.error(
         value instanceof Error ? value.message : "Gagal membatalkan.",
       );
     } finally {
-      setBusy(false);
+      setCancelBusy(false);
     }
   }
 
@@ -132,6 +190,7 @@ export function ClosingDetail({ id }: { id: string }) {
   const pendingPackages = closing.customer_groups
     .flatMap((group) => group.packages)
     .filter((item) => item.merauke_check_status === "PENDING");
+  const closingChecked = closingCheckedCount(closing.merauke_progress);
 
   return (
     <>
@@ -150,30 +209,39 @@ export function ClosingDetail({ id }: { id: string }) {
               ←
             </Link>
             <h1>{closing.code}</h1>
-            <span className={statusTextClass(closing.status)}>
-              {closing.status.replaceAll("_", " ")}
+            <span
+              className={closingStatusClass(closing.status)}
+              style={{ fontSize: 18, fontWeight: 600 }}
+            >
+              {closingStatusLabel(closing.status, closingChecked)}
             </span>
           </div>
           <p className="muted" style={{ marginTop: 4 }}>
             {formatDate(closing.closing_date)} · {closing.merauke_progress} paket
-            dicek Merauke
+            dicek Ops  Merauke
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <a
+          <button
             className="button secondary"
-            href={`/api/v1/closings/${id}/export?format=pdf`}
+            onClick={() => downloadExport("pdf")}
+            disabled={pdfBusy}
           >
-            PDF
-          </a>
-          <a
+            {pdfBusy ? "Generating PDF..." : "Export PDF"}
+          </button>
+          <button
             className="button secondary"
-            href={`/api/v1/closings/${id}/export?format=xlsx`}
+            onClick={() => downloadExport("xlsx")}
+            disabled={xlsxBusy}
           >
-            XLSX
-          </a>
+            {xlsxBusy ? "Exporting Excel..." : "Export Excel"}
+          </button>
           {canCancel && closing.status !== "COMPLETED" && (
-            <button className="button secondary" onClick={cancel} disabled={busy}>
+            <button
+              className="button danger"
+              onClick={openCancel}
+              disabled={busy}
+            >
               Batalkan
             </button>
           )}
@@ -307,6 +375,63 @@ export function ClosingDetail({ id }: { id: string }) {
           </strong>
         </div>
       </div>
+
+      {confirmCancel && (
+        <div
+          className="modal-backdrop"
+          onClick={() => !cancelBusy && setConfirmCancel(false)}
+        >
+          <div
+            className="modal-card"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Batalkan closing"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 6 }}>Batalkan Closing</h3>
+            <p className="muted" style={{ marginBottom: 16, lineHeight: 1.55 }}>
+              Closing <strong>{closing.code}</strong> akan dibatalkan dan paket
+              di dalamnya kembali ke status belum closing. Tindakan ini tidak
+              dapat diurungkan.
+            </p>
+            <label>
+              <span className="label">Alasan pembatalan</span>
+              <textarea
+                className="input"
+                rows={3}
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                placeholder="Tuliskan alasan pembatalan..."
+                autoFocus
+                style={{ resize: "vertical", minHeight: 84 }}
+              />
+            </label>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                marginTop: 18,
+              }}
+            >
+              <button
+                className="button secondary"
+                onClick={() => setConfirmCancel(false)}
+                disabled={cancelBusy}
+              >
+                Kembali
+              </button>
+              <button
+                className="button danger"
+                onClick={submitCancel}
+                disabled={cancelBusy}
+              >
+                {cancelBusy ? "Membatalkan..." : "Batalkan Closing"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

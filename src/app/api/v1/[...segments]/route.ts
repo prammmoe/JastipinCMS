@@ -48,7 +48,8 @@ function capability(segments: string[], method: string): Capability | null {
     return method === "GET" ? "invoices:view" : "payments:manage";
   if (resource === "expenses") return "expenses:manage";
   if (resource === "reports") return "reports:view";
-  if (["users", "rate-configs", "audit-logs", "settings"].includes(resource))
+  if (resource === "account") return "account:manage";
+  if (["users", "rate-configs", "audit-logs"].includes(resource))
     return "settings:manage";
   return null;
 }

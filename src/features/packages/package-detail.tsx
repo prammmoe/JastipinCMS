@@ -141,7 +141,7 @@ export function PackageDetail({ id }: { id: string }) {
         <div>
           <h1>{pkg.package_code}</h1>
           <p className="muted" style={{ margin: "8px 0 0" }}>
-            No Resi: <strong>{pkg.tracking_number}</strong> · Diterima: {formatReceivedDate(pkg.received_date, pkg.received_time)}
+            No Resi: <strong style={{ color: "var(--primary)" }}>{pkg.tracking_number}</strong> · Diterima: {formatReceivedDate(pkg.received_date, pkg.received_time)}
           </p>
         </div>
         {!editing && pkg.permissions.canEdit && (
@@ -199,7 +199,7 @@ export function PackageDetail({ id }: { id: string }) {
             <h3 style={{ marginBottom: 16 }}>Data Paket</h3>
             <div style={{ display: "grid", gap: 12 }}>
               <div><span className="label">Customer</span><div><strong>{pkg.customers?.name ?? "Belum ditetapkan"}</strong> {pkg.customers?.code && <span className="muted" style={{ marginLeft: 8 }}>{pkg.customers.code}</span>}</div></div>
-              <div><span className="label">Status</span><div><span className={statusTextClass(pkg.status)}>{packageStatusLabel(pkg.status)}</span></div></div>
+              <div><span className="label">Status</span><div><span className={statusTextClass(pkg.status)} style={{ fontSize: 18, fontWeight: 600 }}>{packageStatusLabel(pkg.status)}</span></div></div>
               <div><span className="label">Harga</span><div style={{ fontSize: 15 }}><strong>{formatIdr(pkg.shipping_fee_idr)}</strong></div></div>
               <div><span className="label">Berat</span><div><strong>{pkg.actual_weight_kg} kg</strong></div></div>
               <div><span className="label">Kurir</span><div><strong>{pkg.courier || "—"}</strong></div></div>

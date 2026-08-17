@@ -10,8 +10,7 @@ import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
-import { PACKAGE_STATUSES, packageStatusLabel } from "@/lib/package-status";
-import { statusTextClass } from "@/lib/status-text";
+import { packageReceivedClass, packageReceivedLabel } from "@/lib/package-status";
 import { CustomerGroups, type CustomerGroup } from "./customer-groups";
 import { CustomerFilter } from "./customer-filter";
 import { ClosingSelect } from "./closing-select";
@@ -418,11 +417,8 @@ export function PackagesPage() {
                 }}
               >
                 <option value="">Semua status</option>
-                {PACKAGE_STATUSES.map((value) => (
-                  <option key={value} value={value}>
-                    {packageStatusLabel(value)}
-                  </option>
-                ))}
+                <option value="WAITING_CLOSING">Diterima</option>
+                <option value="DAMAGED">Diterima Rusak</option>
               </select>
             </label>
             <label>
@@ -506,8 +502,8 @@ export function PackagesPage() {
                           <td>{row.tracking_number}</td>
                           <td>{row.customers?.name ?? "—"}</td>
                           <td>
-                            <span className={statusTextClass(row.status)}>
-                              {packageStatusLabel(row.status)}
+                            <span className={packageReceivedClass(row.status)}>
+                              {packageReceivedLabel(row.status)}
                             </span>
                           </td>
                           <td>{formatIdr(row.shipping_fee_idr)}</td>

@@ -9,7 +9,11 @@ import { api } from "@/lib/api-client/client";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate } from "@/lib/formatters";
 import { formatIdr } from "@/lib/formatters";
-import { statusTextClass } from "@/lib/status-text";
+import {
+  closingCheckedCount,
+  closingStatusClass,
+  closingStatusLabel,
+} from "@/lib/closing-status";
 
 type ClosingRow = {
   id: string;
@@ -75,15 +79,14 @@ export function ClosingsPage() {
     if (search) params.set("search", search);
     if (month) params.set("month", month);
     const query = params.toString();
-    router.replace(query ? `/closings?${query}` : "/closings", { scroll: false });
+    router.replace(query ? `/closings?${query}` : "/closings", {
+      scroll: false,
+    });
   }, [search, month, router]);
 
   return (
     <>
-      <PageHeader
-        title="Closing"
-        description="Paket menunggu ACC Merauke."
-      />
+      <PageHeader title="Closing" description="Paket menunggu ACC Merauke." />
       <div className="card" style={{ overflow: "hidden" }}>
         <div
           style={{
@@ -154,8 +157,13 @@ export function ClosingsPage() {
                       <td>{formatIdr(row.total_amount_idr)}</td>
                       <td>{row.merauke_progress}</td>
                       <td>
-                        <span className={statusTextClass(row.status)}>
-                          {row.status.replaceAll("_", " ")}
+                        <span
+                          className={closingStatusClass(row.status)}
+                        >
+                          {closingStatusLabel(
+                            row.status,
+                            closingCheckedCount(row.merauke_progress),
+                          )}
                         </span>
                       </td>
                       <td>
@@ -171,8 +179,12 @@ export function ClosingsPage() {
                   ))}
                   {!rows.length && (
                     <tr>
-                      <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 30 }}>
-                        Belum ada closing menunggu Merauke.
+                      <td
+                        colSpan={7}
+                        className="muted"
+                        style={{ textAlign: "center", padding: 30 }}
+                      >
+                        Belum ada closing.
                       </td>
                     </tr>
                   )}

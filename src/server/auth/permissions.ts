@@ -19,7 +19,8 @@ export type Capability =
   | "payments:manage"
   | "expenses:manage"
   | "reports:view"
-  | "settings:manage";
+  | "settings:manage"
+  | "account:manage";
 const matrix: Record<InternalRole, Capability[]> = {
   ADMIN: [
     "dashboard:view",
@@ -40,6 +41,7 @@ const matrix: Record<InternalRole, Capability[]> = {
     "expenses:manage",
     "reports:view",
     "settings:manage",
+    "account:manage",
   ],
   STAFF_SIDOARJO: [
     "dashboard:view",
@@ -54,6 +56,7 @@ const matrix: Record<InternalRole, Capability[]> = {
     "shipments:manage",
     "invoices:view",
     "reports:view",
+    "account:manage",
   ],
   STAFF_MERAUKE: [
     "dashboard:view",
@@ -66,6 +69,7 @@ const matrix: Record<InternalRole, Capability[]> = {
     "pickups:manage",
     "invoices:view",
     "reports:view",
+    "account:manage",
   ],
 };
 

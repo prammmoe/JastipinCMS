@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   Archive,
   Boxes,
-  ChartNoAxesCombined,
   History,
   LayoutDashboard,
   LogOut,
@@ -34,15 +33,8 @@ const groups = [
   },
   { label: "DATA", items: [["/customers", "Customer", Users]] },
   {
-    label: "LAPORAN",
-    items: [
-      ["/reports-operational", "Operasional", ChartNoAxesCombined],
-    ],
-  },
-  {
     label: "SYSTEM",
     items: [
-      ["/rates", "Tarif", Settings],
       ["/users", "Users", Users],
       ["/audit-log", "Audit Log", ReceiptText],
       ["/settings", "Settings", Settings],
@@ -52,17 +44,13 @@ const groups = [
 
 const restricted: Record<string, string[]> = {
   STAFF_SIDOARJO: [
-    "/rates",
     "/users",
     "/audit-log",
-    "/settings",
   ],
   STAFF_MERAUKE: [
     "/incoming",
-    "/rates",
     "/users",
     "/audit-log",
-    "/settings",
   ],
 };
 

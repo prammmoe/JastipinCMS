@@ -14,10 +14,9 @@ import {
 } from "@/server/domain/customers/normalize-customer-name";
 import { normalizeTrackingNumber } from "@/server/domain/tracking/normalize-tracking-number";
 import { updateInternalUser } from "@/server/services/update-internal-user";
+import { changePassword } from "@/server/services/change-password";
 import { exportClosingDocument } from "@/server/services/closing-export-service";
 import { exportPackagesCsv } from "@/server/services/package-export-service";
-import { systemSettings } from "@/server/services/system-settings-service";
-import { AGING } from "@/lib/aging";
 import {
   cloudinaryDeliveryUrl,
   deleteCloudinaryImage,
@@ -46,15 +45,6 @@ const MAX_PACKAGE_PHOTOS = 2;
 
 function packageReceivedAt(date: string, time?: string | null) {
   return new Date(`${date}T${time ?? "00:00"}:00+07:00`).toISOString();
-}
-
-function todayInJakarta() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Jakarta",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 }
 
 function jakartaDateDaysAgo(days: number) {
@@ -180,12 +170,11 @@ export class JastipinService {
       return this.expenses(request, method, id, actor);
     if (resource === "pickups") return this.pickups(request, method, id, actor);
     if (resource === "reports") return this.reports(request, id);
-    if (resource === "audit-logs")
-      return this.simpleList(request, "audit_logs", id, "created_at");
+    if (resource === "audit-logs") return this.auditLogs(request, id);
     if (resource === "users" && method === "PATCH")
       return updateInternalUser(request, id, actor);
     if (resource === "users") return this.users(request, method, id, actor);
-    if (resource === "settings") return systemSettings(request, method, actor);
+    if (resource === "account") return changePassword(request, method, actor);
     if (resource === "files") return this.files(method, id, actor);
     throw new AppError(
       "NOT_FOUND",
@@ -196,13 +185,6 @@ export class JastipinService {
   }
 
   private async dashboard() {
-    const today = todayInJakarta();
-    const todayStartIso = new Date(`${today}T00:00:00+07:00`).toISOString();
-    const todayEndIso = new Date(`${today}T23:59:59.999+07:00`).toISOString();
-    const waitingClosingCutoff = jakartaDateDaysAgo(AGING.waitingClosingDays);
-    const meraukeCutoffIso = new Date(
-      Date.now() - AGING.waitingMeraukeDays * 86_400_000,
-    ).toISOString();
     const trendFrom = jakartaDateDaysAgo(29);
 
     const activeMemberships = db(
@@ -237,93 +219,21 @@ export class JastipinService {
       return countPackages(query);
     };
 
-    const [receivedToday, waitingClosing, waitingMerauke, meraukeCompletedToday] =
+    const [totalReceived, waitingClosing, meraukeApproved] =
       await Promise.all([
         countPackages(
           this.client
             .from("packages")
-            .select("id", { count: "exact", head: true })
-            .eq("received_date", today),
+            .select("id", { count: "exact", head: true }),
         ),
         waitingClosingCount(),
         countPackages(
           this.client
-            .from("closing_packages")
+            .from("closings")
             .select("id", { count: "exact", head: true })
-            .eq("is_active", true)
-            .eq("merauke_check_status", "PENDING")
-            .in("closings.status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"]),
-        ),
-        countPackages(
-          this.client
-            .from("closing_packages")
-            .select("id", { count: "exact", head: true })
-            .eq("merauke_check_status", "OK")
-            .gte("merauke_checked_at", todayStartIso)
-            .lte("merauke_checked_at", todayEndIso),
+            .eq("status", "COMPLETED"),
         ),
       ]);
-
-    const [
-      damaged,
-      missing,
-      hold,
-      agingWaitingClosing,
-      agingWaitingMerauke,
-    ] = await Promise.all([
-      safe(
-        countPackages(
-          this.client
-            .from("packages")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "DAMAGED"),
-        ),
-        0,
-      ),
-      safe(
-        countPackages(
-          this.client
-            .from("packages")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "MISSING"),
-        ),
-        0,
-      ),
-      safe(
-        countPackages(
-          this.client
-            .from("packages")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "HOLD"),
-        ),
-        0,
-      ),
-      safe(
-        (async () => {
-          let query = this.client
-            .from("packages")
-            .select("id", { count: "exact", head: true })
-            .eq("status", "WAITING_CLOSING")
-            .lt("received_date", waitingClosingCutoff);
-          if (activeIds.length)
-            query = query.not("id", "in", `(${activeIds.join(",")})`);
-          return countPackages(query);
-        })(),
-        0,
-      ),
-      safe(
-        countPackages(
-          this.client
-            .from("closing_packages")
-            .select("id", { count: "exact", head: true })
-            .eq("is_active", true)
-            .eq("merauke_check_status", "PENDING")
-            .in("closings.status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"])
-            .lt("closings.finalized_at", meraukeCutoffIso),
-        ),
-        0,
-      ),
-    ]);
 
     const [activeClosings, incomingTrend] = await Promise.all([
       safe(this.fetchActiveClosings(), []),
@@ -332,16 +242,9 @@ export class JastipinService {
 
     return ok({
       summary: {
-        receivedToday,
+        totalReceived,
         waitingClosing,
-        waitingMerauke,
-        meraukeCompletedToday,
-        attentionCount: damaged + missing + hold,
-      },
-      attention: { damaged, missing, hold },
-      aging: {
-        waitingClosingOverThreshold: agingWaitingClosing,
-        waitingMeraukeOverThreshold: agingWaitingMerauke,
+        meraukeApproved,
       },
       activeClosings,
       incomingTrend,
@@ -388,13 +291,13 @@ export class JastipinService {
     const rows = db(
       await this.client
         .from("packages")
-        .select("received_date,count(*)")
-        .gte("received_date", from)
-        .order("received_date", { ascending: true }),
-    ) as { received_date: string; count: number | string }[];
-    const byDate = new Map(
-      rows.map((row) => [row.received_date, Number(row.count)]),
-    );
+        .select("received_date")
+        .gte("received_date", from),
+    ) as { received_date: string }[];
+    const byDate = new Map<string, number>();
+    for (const row of rows) {
+      byDate.set(row.received_date, (byDate.get(row.received_date) ?? 0) + 1);
+    }
     return Array.from({ length: 30 }, (_, index) => {
       const date = jakartaDateDaysAgo(29 - index);
       return { date, count: byDate.get(date) ?? 0 };
@@ -1305,7 +1208,10 @@ export class JastipinService {
     const from = (p.page - 1) * p.pageSize;
     const to = p.page * p.pageSize - 1;
     const page = sorted.slice(from, to + 1);
-    return ok(page, pageMeta(p.page, p.pageSize, sorted.length));
+    return ok(page, {
+      ...pageMeta(p.page, p.pageSize, sorted.length),
+      totalPackages: all.length,
+    });
   }
 
   private async groupedPackages(request: NextRequest) {
@@ -1952,7 +1858,20 @@ export class JastipinService {
         password: input.password,
         email_confirm: true,
       });
-      if (auth.error || !auth.data.user) mapDatabaseError(auth.error);
+      if (auth.error || !auth.data.user) {
+        if (
+          auth.error?.status === 422 ||
+          auth.error?.code === "user_already_exists" ||
+          /already (been )?registered/i.test(auth.error?.message ?? "")
+        )
+          throw new AppError(
+            "USER_ALREADY_EXISTS",
+            "Email sudah terdaftar.",
+            undefined,
+            409,
+          );
+        mapDatabaseError(auth.error);
+      }
       const profile = await this.client
         .from("profiles")
         .insert({ id: auth.data.user.id, name: input.name, role: input.role })
@@ -1964,6 +1883,32 @@ export class JastipinService {
       }
       await this.audit(actor, "USER_CREATED", "USER", auth.data.user.id);
       return ok(profile.data, undefined, { status: 201 });
+    }
+    if (method === "DELETE" && id) {
+      const targetId = requireId(id);
+      if (targetId === actor.id)
+        throw new AppError(
+          "VALIDATION_ERROR",
+          "Tidak bisa menghapus akun sendiri.",
+        );
+      const profileDelete = await this.client
+        .from("profiles")
+        .delete()
+        .eq("id", targetId)
+        .select()
+        .single();
+      if (profileDelete.error) {
+        if (profileDelete.error.code === "23503")
+          throw new AppError(
+            "USER_HAS_HISTORY",
+            "User memiliki riwayat aksi sehingga tidak bisa dihapus. Nonaktifkan akunnya saja.",
+          );
+        mapDatabaseError(profileDelete.error);
+      }
+      const authDelete = await this.client.auth.admin.deleteUser(targetId);
+      if (authDelete.error) mapDatabaseError(authDelete.error);
+      await this.audit(actor, "USER_DELETED", "USER", targetId);
+      return ok({ deleted: true });
     }
     if (method === "PATCH" && id) {
       const input = userSchema
@@ -2050,6 +1995,31 @@ export class JastipinService {
     );
   }
 
+  private async auditLogs(request: NextRequest, id: string | undefined) {
+    if (id)
+      return ok(
+        db(
+          await this.client
+            .from("audit_logs")
+            .select("*,profiles(name)")
+            .eq("id", requireId(id))
+            .single(),
+        ),
+      );
+    const p = pagination(request);
+    const result = await this.client
+      .from("audit_logs")
+      .select("*,profiles(name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(p.from, p.to);
+    if (result.error) mapDatabaseError(result.error);
+    const rows = (result.data ?? []).map((row) => ({
+      ...row,
+      actor_name:
+        (row.profiles as { name?: string } | null | undefined)?.name ?? null,
+    }));
+    return ok(rows, pageMeta(p.page, p.pageSize, result.count ?? 0));
+  }
   private async simpleList(
     request: NextRequest,
     table: string,

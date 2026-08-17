@@ -60,10 +60,21 @@ export function ShipmentDetail({ id }: { id: string }) {
   if (!shipment) return <DetailPageSkeleton />;
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "start",
+        }}
+      >
         <div>
           <h1>{shipment.code}</h1>
-          <p>{shipment.vessel_name ?? "Kapal belum diisi"} · <span className={statusTextClass(shipment.status)}>{shipment.status.replaceAll("_", " ")}</span></p>
+          <p>
+            {shipment.vessel_name ?? "Kapal belum diisi"} ·{" "}
+            <span className={statusTextClass(shipment.status)}>
+              {shipment.status.replaceAll("_", " ")}
+            </span>
+          </p>
         </div>
         {["DRAFT", "READY"].includes(shipment.status) && (
           <button className="button" onClick={() => action("depart")}>
@@ -77,10 +88,15 @@ export function ShipmentDetail({ id }: { id: string }) {
           {closings
             .filter(
               (c) =>
-                !shipment.shipment_closings.some((sc) => sc.closing_id === c.id),
+                !shipment.shipment_closings.some(
+                  (sc) => sc.closing_id === c.id,
+                ),
             )
             .map((c) => (
-              <label key={c.id} style={{ display: "flex", gap: 10, padding: 8 }}>
+              <label
+                key={c.id}
+                style={{ display: "flex", gap: 10, padding: 8 }}
+              >
                 <input
                   type="checkbox"
                   onChange={(e) =>
@@ -109,7 +125,13 @@ export function ShipmentDetail({ id }: { id: string }) {
           onSubmit={scan}
           style={{ padding: 18, display: "flex", gap: 12, marginBottom: 18 }}
         >
-          <input className="input" name="trackingNumber" placeholder="Scan nomor resi" required autoFocus />
+          <input
+            className="input"
+            name="trackingNumber"
+            placeholder="Scan nomor resi"
+            required
+            autoFocus
+          />
           <select className="input" name="condition" style={{ maxWidth: 180 }}>
             <option>OK</option>
             <option>DAMAGED</option>
@@ -118,17 +140,33 @@ export function ShipmentDetail({ id }: { id: string }) {
         </form>
       )}
       {recon && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 18 }}>
-          {[["Expected", recon.expected], ["Checked", recon.checked], ["Remaining", recon.remaining]].map(([label, value]) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3,1fr)",
+            gap: 12,
+            marginBottom: 18,
+          }}
+        >
+          {[
+            ["Expected", recon.expected],
+            ["Checked", recon.checked],
+            ["Remaining", recon.remaining],
+          ].map(([label, value]) => (
             <div className="card" style={{ padding: 18 }} key={String(label)}>
               <span className="muted">{label}</span>
-              <strong style={{ fontSize: 26, display: "block" }}>{value}</strong>
+              <strong style={{ fontSize: 26, display: "block" }}>
+                {value}
+              </strong>
             </div>
           ))}
         </div>
       )}
       {shipment.status !== "RECONCILED" && recon && (
-        <button className="button" onClick={() => action("reconcile", { confirmMissing: true })}>
+        <button
+          className="button"
+          onClick={() => action("reconcile", { confirmMissing: true })}
+        >
           Finalisasi Rekonsiliasi
         </button>
       )}
