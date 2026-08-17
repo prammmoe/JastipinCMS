@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, Phone, User } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
 import { packageStatusLabel } from "@/lib/package-status";
@@ -53,15 +54,14 @@ function currentMonthKey() {
 }
 
 export function CustomerDetail({ id }: { id: string }) {
+  const snackbar = useSnackbar();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [history, setHistory] = useState<HistoryPackage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const load = useCallback(() => {
     setLoading(true);
-    setError("");
     Promise.all([
       api.get<Customer>(`/api/v1/customers/${id}`),
       api.get<HistoryPackage[]>(`/api/v1/customers/${id}/packages`),
@@ -71,10 +71,12 @@ export function CustomerDetail({ id }: { id: string }) {
         setHistory(packages);
       })
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       )
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, snackbar]);
 
   useEffect(() => {
     load();
@@ -120,8 +122,6 @@ export function CustomerDetail({ id }: { id: string }) {
           </Link>
         }
       />
-
-      {error && <div className="feedback error" style={{ marginBottom: 16 }}>{error}</div>}
 
       {loading ? (
         <DetailPageSkeleton />

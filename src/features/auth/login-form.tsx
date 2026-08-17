@@ -4,15 +4,15 @@ import { FormEvent, useState } from "react";
 import { PackageCheck } from "lucide-react";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 export function LoginForm({ applicationName }: { applicationName: string }) {
-  const [error, setError] = useState("");
+  const snackbar = useSnackbar();
   const [busy, setBusy] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
-    setError("");
     const form = new FormData(event.currentTarget);
 
     try {
@@ -22,7 +22,7 @@ export function LoginForm({ applicationName }: { applicationName: string }) {
       });
       location.assign("/dashboard");
     } catch (value) {
-      setError(
+      snackbar.error(
         value instanceof ApiClientError ? value.message : "Gagal masuk.",
       );
     } finally {
@@ -74,7 +74,6 @@ export function LoginForm({ applicationName }: { applicationName: string }) {
               required
             />
           </label>
-          {error && <div className="feedback error">{error}</div>}
           <button className="button" disabled={busy}>
             {busy ? "Memproses..." : "Masuk"}
           </button>

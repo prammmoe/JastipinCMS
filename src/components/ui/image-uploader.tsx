@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { Camera, X, ImageIcon } from "lucide-react";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 export type ImageUploaderHandle = {
   getFiles: () => File[];
@@ -31,7 +32,7 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
     const videoRef = useRef<HTMLVideoElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
-    const [cameraError, setCameraError] = useState("");
+    const snackbar = useSnackbar();
 
     useImperativeHandle(ref, () => ({
       getFiles: () => previews.map((p) => p.file),
@@ -77,7 +78,6 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
     }, [cameraOpen]);
 
     async function openCamera() {
-      setCameraError("");
       if (!navigator.mediaDevices?.getUserMedia) {
         cameraInputRef.current?.click();
         return;
@@ -97,7 +97,7 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
         }
       }
       if (!stream) {
-        setCameraError(
+        snackbar.error(
           "Kamera tidak dapat diakses. Izinkan kamera di pengaturan browser atau gunakan Galeri.",
         );
         return;
@@ -168,7 +168,6 @@ const ImageUploader = forwardRef<ImageUploaderHandle, ImageUploaderProps>(
           {previews.length}/{maxFiles} foto. Format: JPEG, PNG, WebP. Maks 3 MB
           per foto.
         </div>
-        {cameraError && <div className="feedback error">{cameraError}</div>}
 
         {previews.length > 0 && (
           <div className="image-uploader-previews">

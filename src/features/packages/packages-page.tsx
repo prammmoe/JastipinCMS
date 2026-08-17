@@ -8,6 +8,7 @@ import { Search } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
 import { PACKAGE_STATUSES, packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
@@ -73,28 +74,41 @@ function monthOptions() {
 export function PackagesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<"packages" | "customers">(
-    () => (searchParams.get("view") === "customers" ? "customers" : "packages"),
+  const snackbar = useSnackbar();
+  const [view, setView] = useState<"packages" | "customers">(() =>
+    searchParams.get("view") === "customers" ? "customers" : "packages",
   );
   const [rows, setRows] = useState<PackageRow[]>([]);
   const [groups, setGroups] = useState<CustomerGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
-  const [datePreset, setDatePreset] = useState<DatePreset>(() => (searchParams.get("preset") as DatePreset) ?? "");
+  const [datePreset, setDatePreset] = useState<DatePreset>(
+    () => (searchParams.get("preset") as DatePreset) ?? "",
+  );
   const [month, setMonth] = useState(() => searchParams.get("month") ?? "");
-  const [customFrom, setCustomFrom] = useState(() => searchParams.get("from") ?? "");
+  const [customFrom, setCustomFrom] = useState(
+    () => searchParams.get("from") ?? "",
+  );
   const [customTo, setCustomTo] = useState(() => searchParams.get("to") ?? "");
   const [status, setStatus] = useState(() => searchParams.get("status") ?? "");
-  const [sort, setSort] = useState(() => searchParams.get("sort") ?? "received_desc");
-  const [customerId, setCustomerId] = useState(() => searchParams.get("customerId") ?? "");
-  const [page, setPage] = useState(() => Number(searchParams.get("page") ?? "1") || 1);
+  const [attention, setAttention] = useState(
+    () => searchParams.get("attention") === "true",
+  );
+  const [sort, setSort] = useState(
+    () => searchParams.get("sort") ?? "received_desc",
+  );
+  const [customerId, setCustomerId] = useState(
+    () => searchParams.get("customerId") ?? "",
+  );
+  const [page, setPage] = useState(
+    () => Number(searchParams.get("page") ?? "1") || 1,
+  );
   const [pageSize, setPageSize] = useState(() => {
     const value = Number(searchParams.get("pageSize") ?? "50");
     return [10, 50, 200].includes(value) ? value : 50;
   });
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const [error, setError] = useState("");
   const [selecting, setSelecting] = useState(false);
   const [user, setUser] = useState<Actor>();
 
@@ -121,6 +135,7 @@ export function PackagesPage() {
     if (customFrom) params.set("from", customFrom);
     if (customTo) params.set("to", customTo);
     if (status) params.set("status", status);
+    if (attention) params.set("attention", "true");
     if (sort !== "received_desc") params.set("sort", sort);
     if (customerId) params.set("customerId", customerId);
     if (page !== 1) params.set("page", String(page));
@@ -129,16 +144,35 @@ export function PackagesPage() {
     router.replace(query ? `/packages?${query}` : "/packages", {
       scroll: false,
     });
-  }, [view, search, datePreset, month, customFrom, customTo, status, sort, customerId, page, pageSize, router]);
+  }, [
+    view,
+    search,
+    datePreset,
+    month,
+    customFrom,
+    customTo,
+    status,
+    attention,
+    sort,
+    customerId,
+    page,
+    pageSize,
+    router,
+  ]);
 
   const load = useCallback(() => {
-    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize), search, sort });
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      search,
+      sort,
+    });
     if (dateFrom) query.set("dateFrom", dateFrom);
     if (dateTo) query.set("dateTo", dateTo);
-    if (status) query.set("status", status);
+    if (attention) query.set("attention", "true");
+    else if (status) query.set("status", status);
     if (view === "customers" && customerId) query.set("customerId", customerId);
     setLoading(true);
-    setError("");
     const path =
       view === "customers"
         ? `/api/v1/packages/grouped-by-customer?${query}`
@@ -153,10 +187,24 @@ export function PackagesPage() {
         if (page > (meta?.totalPages ?? 1)) setPage(meta?.totalPages ?? 1);
       })
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       )
       .finally(() => setLoading(false));
-  }, [dateFrom, dateTo, search, sort, status, view, customerId, page, pageSize]);
+  }, [
+    dateFrom,
+    dateTo,
+    search,
+    sort,
+    status,
+    attention,
+    view,
+    customerId,
+    page,
+    pageSize,
+    snackbar,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 180);
@@ -169,7 +217,19 @@ export function PackagesPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [view, search, datePreset, month, customFrom, customTo, status, sort, customerId, pageSize]);
+  }, [
+    view,
+    search,
+    datePreset,
+    month,
+    customFrom,
+    customTo,
+    status,
+    attention,
+    sort,
+    customerId,
+    pageSize,
+  ]);
 
   return (
     <>
@@ -178,8 +238,11 @@ export function PackagesPage() {
         description="Cari, filter, dan urutkan seluruh paket."
         actions={
           user && (user.role === "ADMIN" || user.role === "STAFF_SIDOARJO") ? (
-            <button className="button" onClick={() => setSelecting((value) => !value)}>
-              {selecting ? "Kembali ke daftar" : "Buat Closing Surabaya"}
+            <button
+              className="button"
+              onClick={() => setSelecting((value) => !value)}
+            >
+              {selecting ? "Kembali ke daftar" : "Buat Closing"}
             </button>
           ) : undefined
         }
@@ -192,270 +255,354 @@ export function PackagesPage() {
           onExit={() => setSelecting(false)}
         />
       ) : (
-      <div className="card" style={{ overflow: "hidden" }}>
-        <div
-          style={{
-            padding: "12px 18px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            borderBottom: "1px solid var(--border)",
-            flexWrap: "wrap",
-          }}
-        >
-          <strong style={{ fontSize: 14, fontWeight: 600 }}>
-            {view === "customers" ? "Per Customer" : "Per Barang"}
-          </strong>
+        <div className="card" style={{ overflow: "hidden" }}>
           <div
             style={{
+              padding: "12px 18px",
               display: "flex",
-              gap: 6,
-              background: "var(--neutral-100)",
-              borderRadius: "var(--radius-md)",
-              padding: 3,
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              borderBottom: "1px solid var(--border)",
+              flexWrap: "wrap",
             }}
           >
-            <button
-              className="button"
+            <strong style={{ fontSize: 14, fontWeight: 600 }}>
+              {view === "customers" ? "Per Customer" : "Per Barang"}
+            </strong>
+            <div
               style={{
-                ...(view === "packages"
-                  ? { background: "var(--primary)", color: "white" }
-                  : {}),
+                display: "flex",
+                gap: 6,
+                background: "var(--neutral-100)",
+                borderRadius: "var(--radius-md)",
+                padding: 3,
               }}
-              onClick={() => setView("packages")}
             >
-              Per Barang
-            </button>
-            <button
-              className="button"
-              style={{
-                ...(view === "customers"
-                  ? { background: "var(--primary)", color: "white" }
-                  : {}),
-              }}
-              onClick={() => setView("customers")}
-            >
-              Per Customer
-            </button>
+              <button
+                className="button"
+                style={{
+                  ...(view === "packages"
+                    ? { background: "var(--primary)", color: "white" }
+                    : {}),
+                }}
+                onClick={() => setView("packages")}
+              >
+                Per Barang
+              </button>
+              <button
+                className="button"
+                style={{
+                  ...(view === "customers"
+                    ? { background: "var(--primary)", color: "white" }
+                    : {}),
+                }}
+                onClick={() => setView("customers")}
+              >
+                Per Customer
+              </button>
+            </div>
           </div>
-        </div>
-        <div
-          style={{
-            padding: 18,
-            display: "grid",
-            gridTemplateColumns:
-              view === "customers"
-                ? "minmax(200px,1.6fr) minmax(180px,1fr) minmax(180px,1fr) repeat(2,minmax(150px,1fr))"
-                : "minmax(220px,2fr) repeat(4,minmax(150px,1fr))",
-            gap: 10,
-            alignItems: "end",
-            borderBottom: "1px solid var(--border)",
-          }}
-          className="grid-responsive"
-        >
-          <label>
-            <span className="label">Cari</span>
-            <span style={{ position: "relative", display: "block" }}>
-              <Search size={16} style={{ position: "absolute", left: 12, top: 12 }} />
-              <input
+          <div
+            style={{
+              padding: 18,
+              display: "grid",
+              gridTemplateColumns:
+                view === "customers"
+                  ? "minmax(200px,1.6fr) minmax(180px,1fr) minmax(180px,1fr) repeat(2,minmax(150px,1fr))"
+                  : "minmax(220px,2fr) repeat(4,minmax(150px,1fr))",
+              gap: 10,
+              alignItems: "end",
+              borderBottom: "1px solid var(--border)",
+            }}
+            className="grid-responsive"
+          >
+            <label>
+              <span className="label">Cari</span>
+              <span style={{ position: "relative", display: "block" }}>
+                <Search
+                  size={16}
+                  style={{ position: "absolute", left: 12, top: 12 }}
+                />
+                <input
+                  className="input"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={
+                    view === "customers"
+                      ? "Nomor resi, kode, atau nama customer"
+                      : "Nomor resi, kode, atau nama customer"
+                  }
+                  style={{ paddingLeft: 38 }}
+                />
+              </span>
+            </label>
+            {view === "customers" && (
+              <CustomerFilter value={customerId} onChange={setCustomerId} />
+            )}
+            <label>
+              <span className="label">Tanggal</span>
+              <select
                 className="input"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder={
-                  view === "customers"
-                    ? "Nomor resi, kode, atau nama customer"
-                    : "Nomor resi, kode, atau nama customer"
-                }
-                style={{ paddingLeft: 38 }}
-              />
-            </span>
-          </label>
-          {view === "customers" && (
-            <CustomerFilter value={customerId} onChange={setCustomerId} />
-          )}
-          <label>
-            <span className="label">Tanggal</span>
-            <select
-              className="input"
-              value={datePreset}
-              onChange={(event) => {
-                const next = event.target.value as DatePreset;
-                setDatePreset(next);
-                if (next !== "custom") {
-                  setMonth("");
-                  setCustomFrom("");
-                  setCustomTo("");
-                }
-              }}
-            >
-              <option value="">Semua tanggal</option>
-              <option value="today">Hari ini</option>
-              <option value="7d">7 hari terakhir</option>
-              <option value="30d">30 hari terakhir</option>
-              <option value="custom">Custom (range)</option>
-            </select>
-          </label>
-          <label>
-            <span className="label">Periode</span>
-            <select
-              className="input"
-              value={month}
-              onChange={(event) => {
-                const next = event.target.value;
-                setMonth(next);
-                if (next) {
-                  setDatePreset("");
-                  setCustomFrom("");
-                  setCustomTo("");
-                }
-              }}
-            >
-              <option value="">Semua bulan</option>
-              {monthOptions().map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {datePreset === "custom" && (
-            <>
-              <label>
-                <span className="label">Dari tanggal</span>
-                <input
-                  className="input"
-                  type="date"
-                  value={customFrom}
-                  onChange={(event) => setCustomFrom(event.target.value)}
-                />
-              </label>
-              <label>
-                <span className="label">Sampai tanggal</span>
-                <input
-                  className="input"
-                  type="date"
-                  value={customTo}
-                  onChange={(event) => setCustomTo(event.target.value)}
-                />
-              </label>
-            </>
-          )}
-          <label>
-            <span className="label">Status</span>
-            <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="">Semua status</option>
-              {PACKAGE_STATUSES.map((value) => (
-                <option key={value} value={value}>{packageStatusLabel(value)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            <span className="label">Urutkan</span>
-            <select className="input" value={sort} onChange={(event) => setSort(event.target.value)}>
-              {view === "customers" ? (
-                <>
-                  <option value="name_asc">Nama A-Z</option>
-                  <option value="packages_desc">Barang Terbanyak</option>
-                  <option value="received_desc">Terbaru</option>
-                </>
-              ) : (
-                <>
-                  <option value="received_desc">Terbaru</option>
-                  <option value="received_asc">Terlama</option>
-                  <option value="fee_desc">Biaya terbesar</option>
-                  <option value="fee_asc">Biaya terkecil</option>
-                </>
-              )}
-            </select>
-          </label>
-        </div>
-        {error && <div className="feedback error" style={{ margin: 16 }}>{error}</div>}
-        {view === "customers" ? (
-          <div style={{ padding: 16 }}>
-            <CustomerGroups groups={groups} loading={loading} error={error} />
-          </div>
-        ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table>
-              <thead><tr><th>Kode</th><th>Nomor Resi</th><th>Customer</th><th>Status</th><th>Biaya</th><th>Diterima</th><th /></tr></thead>
-              <tbody>
-                {loading ? (
-                  <TableSkeleton columns={6} hasActionColumn />
+                value={datePreset}
+                onChange={(event) => {
+                  const next = event.target.value as DatePreset;
+                  setDatePreset(next);
+                  if (next !== "custom") {
+                    setMonth("");
+                    setCustomFrom("");
+                    setCustomTo("");
+                  }
+                }}
+              >
+                <option value="">Semua tanggal</option>
+                <option value="today">Hari ini</option>
+                <option value="7d">7 hari terakhir</option>
+                <option value="30d">30 hari terakhir</option>
+                <option value="custom">Custom (range)</option>
+              </select>
+            </label>
+            <label>
+              <span className="label">Periode</span>
+              <select
+                className="input"
+                value={month}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setMonth(next);
+                  if (next) {
+                    setDatePreset("");
+                    setCustomFrom("");
+                    setCustomTo("");
+                  }
+                }}
+              >
+                <option value="">Semua bulan</option>
+                {monthOptions().map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {datePreset === "custom" && (
+              <>
+                <label>
+                  <span className="label">Dari tanggal</span>
+                  <input
+                    className="input"
+                    type="date"
+                    value={customFrom}
+                    onChange={(event) => setCustomFrom(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span className="label">Sampai tanggal</span>
+                  <input
+                    className="input"
+                    type="date"
+                    value={customTo}
+                    onChange={(event) => setCustomTo(event.target.value)}
+                  />
+                </label>
+              </>
+            )}
+            <label>
+              <span className="label">Status</span>
+              <select
+                className="input"
+                value={status}
+                onChange={(event) => {
+                  setStatus(event.target.value);
+                  setAttention(false);
+                }}
+              >
+                <option value="">Semua status</option>
+                {PACKAGE_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {packageStatusLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="label">Urutkan</span>
+              <select
+                className="input"
+                value={sort}
+                onChange={(event) => setSort(event.target.value)}
+              >
+                {view === "customers" ? (
+                  <>
+                    <option value="name_asc">Nama A-Z</option>
+                    <option value="packages_desc">Barang Terbanyak</option>
+                    <option value="received_desc">Terbaru</option>
+                  </>
                 ) : (
                   <>
-                    {rows.map((row) => (
-                      <tr key={row.id}>
-                        <td>{row.package_code}</td>
-                        <td>{row.tracking_number}</td>
-                        <td>{row.customers?.name ?? "—"}</td>
-                        <td><span className={statusTextClass(row.status)}>{packageStatusLabel(row.status)}</span></td>
-                        <td>{formatIdr(row.shipping_fee_idr)}</td>
-                        <td>{formatReceivedDate(row.received_date, row.received_time)}</td>
-                        <td><Link className="button secondary" href={`/packages/${row.id}`} style={{ padding: "6px 10px" }}>Detail</Link></td>
-                      </tr>
-                    ))}
-                    {!rows.length && (
-                      <tr>
-                        <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 30 }}>
-                          Belum ada data.
-                        </td>
-                      </tr>
-                    )}
+                    <option value="received_desc">Terbaru</option>
+                    <option value="received_asc">Terlama</option>
+                    <option value="fee_desc">Biaya terbesar</option>
+                    <option value="fee_asc">Biaya terkecil</option>
                   </>
                 )}
-              </tbody>
-            </table>
+              </select>
+            </label>
           </div>
-        )}
-        <div
-          style={{
-            padding: "12px 18px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 10,
-            flexWrap: "wrap",
-            borderTop: "1px solid var(--border)",
-          }}
-        >
-          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span className="muted" style={{ fontSize: 12 }}>Per halaman</span>
-            <select
-              className="input"
-              value={pageSize}
-              onChange={(event) => setPageSize(Number(event.target.value))}
-              style={{ width: 90, minHeight: 34, paddingTop: 6, paddingBottom: 6 }}
+          {attention && (
+            <div
+              className="card"
+              style={{
+                margin: "0 16px 16px",
+                padding: "10px 14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
             >
-              <option value={10}>10</option>
-              <option value={50}>50</option>
-              <option value={200}>200</option>
-            </select>
-          </label>
-          <div className="muted" style={{ fontSize: 12 }}>
-            Menampilkan {loading ? "…" : rows.length} dari {total} data
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <button
-              className="button secondary"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              Sebelumnya
-            </button>
-            <span className="muted" style={{ fontSize: 12, minWidth: 60, textAlign: "center" }}>
-              {page} / {totalPages}
-            </span>
-            <button
-              className="button secondary"
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              Berikutnya
-            </button>
+              <span className="status-text danger" style={{ fontSize: 13 }}>
+                Filter perlu perhatian aktif: rusak, hilang, dan ditahan.
+              </span>
+              <button
+                className="button secondary"
+                style={{ padding: "6px 12px", minHeight: 32 }}
+                onClick={() => {
+                  setAttention(false);
+                  setStatus("");
+                }}
+              >
+                Hapus filter
+              </button>
+            </div>
+          )}
+          {view === "customers" ? (
+            <div style={{ padding: 16 }}>
+              <CustomerGroups groups={groups} loading={loading} />
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kode</th>
+                    <th>Nomor Resi</th>
+                    <th>Customer</th>
+                    <th>Status</th>
+                    <th>Biaya</th>
+                    <th>Diterima</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <TableSkeleton columns={6} hasActionColumn />
+                  ) : (
+                    <>
+                      {rows.map((row) => (
+                        <tr key={row.id}>
+                          <td>{row.package_code}</td>
+                          <td>{row.tracking_number}</td>
+                          <td>{row.customers?.name ?? "—"}</td>
+                          <td>
+                            <span className={statusTextClass(row.status)}>
+                              {packageStatusLabel(row.status)}
+                            </span>
+                          </td>
+                          <td>{formatIdr(row.shipping_fee_idr)}</td>
+                          <td>
+                            {formatReceivedDate(
+                              row.received_date,
+                              row.received_time,
+                            )}
+                          </td>
+                          <td>
+                            <Link
+                              className="button secondary"
+                              href={`/packages/${row.id}`}
+                              style={{ padding: "6px 10px" }}
+                            >
+                              Detail
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                      {!rows.length && (
+                        <tr>
+                          <td
+                            colSpan={7}
+                            className="muted"
+                            style={{ textAlign: "center", padding: 30 }}
+                          >
+                            Belum ada data.
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div
+            style={{
+              padding: "12px 18px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="muted" style={{ fontSize: 12 }}>
+                Per halaman
+              </span>
+              <select
+                className="input"
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+                style={{
+                  width: 90,
+                  minHeight: 34,
+                  paddingTop: 6,
+                  paddingBottom: 6,
+                }}
+              >
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={200}>200</option>
+              </select>
+            </label>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Menampilkan {loading ? "…" : rows.length} dari {total} data
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <button
+                className="button secondary"
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Sebelumnya
+              </button>
+              <span
+                className="muted"
+                style={{ fontSize: 12, minWidth: 60, textAlign: "center" }}
+              >
+                {page} / {totalPages}
+              </span>
+              <button
+                className="button secondary"
+                disabled={page >= totalPages}
+                onClick={() => setPage(page + 1)}
+              >
+                Berikutnya
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       )}
     </>
   );

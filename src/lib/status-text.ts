@@ -5,7 +5,6 @@ const SUCCESS = new Set([
   "ARRIVED",
   "RECONCILED",
   "FINALIZED",
-  "WAITING_CLOSING",
   "PAID",
   "ACTIVE",
 ]);
@@ -18,6 +17,7 @@ const WARNING = new Set([
   "PARTIAL",
   "READY",
   "DEPARTED",
+  "WAITING_CLOSING",
 ]);
 
 const DANGER = new Set([

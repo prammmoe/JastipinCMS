@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate, formatIdr } from "@/lib/formatters";
+import { packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
 
 type PackageRow = {
@@ -52,20 +54,21 @@ const CONDITION_CLASS: Record<string, string> = {
 };
 
 export function ShippingHistoryDetail({ id }: { id: string }) {
+  const snackbar = useSnackbar();
   const [closing, setClosing] = useState<Closing>();
-  const [error, setError] = useState("");
 
   useEffect(() => {
     api
       .get<Closing>(`/api/v1/shipping-history/${id}`)
       .then(setClosing)
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       );
-  }, [id]);
+  }, [id, snackbar]);
 
-  if (!closing)
-    return error ? <div className="feedback error">{error}</div> : <DetailPageSkeleton />;
+  if (!closing) return <DetailPageSkeleton />;
   return (
     <>
       <div
@@ -88,7 +91,7 @@ export function ShippingHistoryDetail({ id }: { id: string }) {
             </Link>
             <h1>{closing.code}</h1>
             <span className={statusTextClass(closing.status)}>
-              {closing.status.replaceAll("_", " ")}
+              {packageStatusLabel(closing.status)}
             </span>
           </div>
           <p className="muted" style={{ marginTop: 4 }}>

@@ -2,6 +2,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
 import { FormFieldsSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatIdr } from "@/lib/formatters";
 type Invoice = {
   id: string;
@@ -11,8 +12,8 @@ type Invoice = {
 };
 
 export function PaymentPage() {
+  const snackbar = useSnackbar();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const load = () =>
     api
@@ -39,11 +40,13 @@ export function PaymentPage() {
         },
         { "Idempotency-Key": crypto.randomUUID() },
       );
-      setMessage("Pembayaran berhasil dicatat.");
+      snackbar.success("Pembayaran berhasil dicatat.");
       event.currentTarget.reset();
       load();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
   if (loading) {
@@ -105,7 +108,6 @@ export function PaymentPage() {
           <button className="button">Catat Pembayaran</button>
         </div>
       </form>
-      {message && <p>{message}</p>}
     </>
   );
 }

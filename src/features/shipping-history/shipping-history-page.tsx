@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate, formatIdr } from "@/lib/formatters";
+import { packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
 
 type HistoryRow = {
@@ -36,9 +38,9 @@ function monthOptions() {
 export function ShippingHistoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const snackbar = useSnackbar();
   const [rows, setRows] = useState<HistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
   const [month, setMonth] = useState(() => searchParams.get("month") ?? "");
 
@@ -47,15 +49,16 @@ export function ShippingHistoryPage() {
     if (search) query.set("search", search);
     if (month) query.set("month", month);
     setLoading(true);
-    setError("");
     api
       .get<HistoryRow[]>(`/api/v1/shipping-history?${query}`)
       .then(setRows)
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       )
       .finally(() => setLoading(false));
-  }, [search, month]);
+  }, [search, month, snackbar]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 180);
@@ -122,7 +125,6 @@ export function ShippingHistoryPage() {
             </select>
           </div>
         </div>
-        {error && <div className="feedback error" style={{ margin: 16 }}>{error}</div>}
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>
@@ -131,14 +133,13 @@ export function ShippingHistoryPage() {
                 <th>Tanggal</th>
                 <th>Paket</th>
                 <th>Total</th>
-                <th>Ekspedisi</th>
                 <th>Status</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <TableSkeleton columns={6} hasActionColumn />
+                <TableSkeleton columns={5} hasActionColumn />
               ) : (
                 <>
                   {rows.map((row) => (
@@ -148,17 +149,8 @@ export function ShippingHistoryPage() {
                       <td>{row.package_count}</td>
                       <td>{formatIdr(row.total_amount_idr)}</td>
                       <td>
-                        {row.exception_count > 0 ? (
-                          <span className="status-text warning">
-                            {row.exception_count} kecuali
-                          </span>
-                        ) : (
-                          <span className="status-text success">Bersih</span>
-                        )}
-                      </td>
-                      <td>
                         <span className={statusTextClass(row.status)}>
-                          {row.status.replaceAll("_", " ")}
+                          {packageStatusLabel(row.status)}
                         </span>
                       </td>
                       <td>
@@ -174,7 +166,7 @@ export function ShippingHistoryPage() {
                   ))}
                   {!rows.length && (
                     <tr>
-                      <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 30 }}>
+                      <td colSpan={6} className="muted" style={{ textAlign: "center", padding: 30 }}>
                         Belum ada riwayat pengiriman.
                       </td>
                     </tr>

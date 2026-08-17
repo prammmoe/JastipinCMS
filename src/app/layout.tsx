@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { getApplicationName } from "@/server/deployment";
+import { SnackbarProvider } from "@/components/ui/snackbar";
 import "./globals.css";
 
 const inter = localFont({
@@ -26,7 +27,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        <SnackbarProvider>{children}</SnackbarProvider>
+      </body>
     </html>
   );
 }

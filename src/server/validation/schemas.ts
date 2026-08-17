@@ -13,7 +13,7 @@ export const packageIntakeSchema = packageSchema.extend({
 }).superRefine((value,context)=>{if(!value.customerId&&!value.customerName?.trim())context.addIssue({code:"custom",path:["customerName"],message:"Customer wajib diisi."})});
 const packageStatusEnum = z.enum(["WAITING_CLOSING","READY_TO_SHIP","IN_TRANSIT","ARRIVED_MERAUKE","READY_FOR_PICKUP","COMPLETED","HOLD","DAMAGED","MISSING"]);
 export const packageListSchema = paginationSchema.extend({
-  dateFrom:z.iso.date().optional(),dateTo:z.iso.date().optional(),customerId:z.uuid().optional(),status:packageStatusEnum.optional(),
+  dateFrom:z.iso.date().optional(),dateTo:z.iso.date().optional(),customerId:z.uuid().optional(),status:packageStatusEnum.optional(),attention:z.enum(["true","false"]).optional(),
   sort:z.enum(["received_desc","received_asc","fee_desc","fee_asc","name_asc","name_desc","packages_desc","packages_asc"]).default("received_desc")
 });
 export const customerHistorySchema = z.object({

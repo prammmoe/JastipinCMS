@@ -8,18 +8,15 @@ import {
   type ImageUploaderHandle,
 } from "@/components/ui/image-uploader";
 import { PageHeader } from "@/components/ui/page-header";
-import { Snackbar, SnackbarType } from "@/components/ui/snackbar";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 
 export default function IncomingPage() {
+  const snackbar = useSnackbar();
   const tracking = useRef<HTMLInputElement>(null);
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
   const [formResetSignal, setFormResetSignal] = useState(0);
-  const [snackbar, setSnackbar] = useState<{
-    message: string;
-    type: SnackbarType;
-  } | null>(null);
   const [duplicate, setDuplicate] = useState(false);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
@@ -27,7 +24,6 @@ export default function IncomingPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSnackbar(null);
     const form = event.currentTarget;
     const data = new FormData(form);
 
@@ -56,10 +52,7 @@ export default function IncomingPage() {
     try {
       const files = imageUploaderRef.current?.getFiles() ?? [];
       if (files.length === 0) {
-        setSnackbar({
-          message: "Minimal satu foto bukti wajib diunggah.",
-          type: SnackbarType.Warning,
-        });
+        snackbar.error("Minimal satu foto bukti wajib diunggah.");
         return;
       }
       const requestForm = new FormData();
@@ -70,10 +63,7 @@ export default function IncomingPage() {
         requestForm,
       );
 
-      setSnackbar({
-        message: `${result.package_code} berhasil dicatat.`,
-        type: SnackbarType.Success,
-      });
+      snackbar.success(`${result.package_code} berhasil dicatat.`);
       form.reset();
       imageUploaderRef.current?.clear();
       setFormResetSignal((current) => current + 1);
@@ -85,16 +75,13 @@ export default function IncomingPage() {
         value.code === "PACKAGE_DUPLICATE_TRACKING"
       ) {
         setDuplicate(true);
-        setSnackbar({
-          message: "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
-          type: SnackbarType.Warning,
-        });
+        snackbar.error(
+          "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
+        );
       } else {
-        setSnackbar({
-          message:
-            value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
-          type: SnackbarType.Failed,
-        });
+        snackbar.error(
+          value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
+        );
       }
     }
   }
@@ -226,14 +213,6 @@ export default function IncomingPage() {
           <button className="button">Simpan &amp; Paket Berikutnya</button>
         </div>
       </form>
-
-      {snackbar && (
-        <Snackbar
-          message={snackbar.message}
-          type={snackbar.type}
-          onClose={() => setSnackbar(null)}
-        />
-      )}
     </>
   );
 }

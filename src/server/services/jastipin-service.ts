@@ -17,6 +17,7 @@ import { updateInternalUser } from "@/server/services/update-internal-user";
 import { exportClosingDocument } from "@/server/services/closing-export-service";
 import { exportPackagesCsv } from "@/server/services/package-export-service";
 import { systemSettings } from "@/server/services/system-settings-service";
+import { AGING } from "@/lib/aging";
 import {
   cloudinaryDeliveryUrl,
   deleteCloudinaryImage,
@@ -54,6 +55,15 @@ function todayInJakarta() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function jakartaDateDaysAgo(days: number) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(Date.now() - days * 86_400_000));
 }
 
 function packagePayload(form: FormData) {
@@ -186,42 +196,208 @@ export class JastipinService {
   }
 
   private async dashboard() {
-    const [received, waiting, ready, transit, pickup, invoices] =
+    const today = todayInJakarta();
+    const todayStartIso = new Date(`${today}T00:00:00+07:00`).toISOString();
+    const todayEndIso = new Date(`${today}T23:59:59.999+07:00`).toISOString();
+    const waitingClosingCutoff = jakartaDateDaysAgo(AGING.waitingClosingDays);
+    const meraukeCutoffIso = new Date(
+      Date.now() - AGING.waitingMeraukeDays * 86_400_000,
+    ).toISOString();
+    const trendFrom = jakartaDateDaysAgo(29);
+
+    const activeMemberships = db(
+      await this.client
+        .from("closing_packages")
+        .select("package_id")
+        .eq("is_active", true),
+    ) as { package_id: string }[];
+    const activeIds = activeMemberships.map((item) => item.package_id);
+
+    const countPackages = async (
+      query: PromiseLike<{ count: number | null; error: unknown }>,
+    ) => {
+      const result = await query;
+      if (result.error) mapDatabaseError(result.error);
+      return result.count ?? 0;
+    };
+    const safe = async <T>(promise: PromiseLike<T>, fallback: T) => {
+      try {
+        return await promise;
+      } catch {
+        return fallback;
+      }
+    };
+    const waitingClosingCount = async () => {
+      let query = this.client
+        .from("packages")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "WAITING_CLOSING");
+      if (activeIds.length)
+        query = query.not("id", "in", `(${activeIds.join(",")})`);
+      return countPackages(query);
+    };
+
+    const [receivedToday, waitingClosing, waitingMerauke, meraukeCompletedToday] =
       await Promise.all([
-        this.client
-          .from("packages")
-          .select("id", { count: "exact", head: true })
-          .eq("received_date", todayInJakarta()),
-        this.client
-          .from("packages")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "WAITING_CLOSING"),
-        this.client
-          .from("packages")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "READY_TO_SHIP"),
-        this.client
-          .from("packages")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "IN_TRANSIT"),
-        this.client
-          .from("packages")
-          .select("id", { count: "exact", head: true })
-          .eq("status", "READY_FOR_PICKUP"),
-        this.client
-          .from("invoices")
-          .select("balance_idr")
-          .in("status", ["UNPAID", "PARTIAL"]),
+        countPackages(
+          this.client
+            .from("packages")
+            .select("id", { count: "exact", head: true })
+            .eq("received_date", today),
+        ),
+        waitingClosingCount(),
+        countPackages(
+          this.client
+            .from("closing_packages")
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true)
+            .eq("merauke_check_status", "PENDING")
+            .in("closings.status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"]),
+        ),
+        countPackages(
+          this.client
+            .from("closing_packages")
+            .select("id", { count: "exact", head: true })
+            .eq("merauke_check_status", "OK")
+            .gte("merauke_checked_at", todayStartIso)
+            .lte("merauke_checked_at", todayEndIso),
+        ),
       ]);
+
+    const [
+      damaged,
+      missing,
+      hold,
+      agingWaitingClosing,
+      agingWaitingMerauke,
+    ] = await Promise.all([
+      safe(
+        countPackages(
+          this.client
+            .from("packages")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "DAMAGED"),
+        ),
+        0,
+      ),
+      safe(
+        countPackages(
+          this.client
+            .from("packages")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "MISSING"),
+        ),
+        0,
+      ),
+      safe(
+        countPackages(
+          this.client
+            .from("packages")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "HOLD"),
+        ),
+        0,
+      ),
+      safe(
+        (async () => {
+          let query = this.client
+            .from("packages")
+            .select("id", { count: "exact", head: true })
+            .eq("status", "WAITING_CLOSING")
+            .lt("received_date", waitingClosingCutoff);
+          if (activeIds.length)
+            query = query.not("id", "in", `(${activeIds.join(",")})`);
+          return countPackages(query);
+        })(),
+        0,
+      ),
+      safe(
+        countPackages(
+          this.client
+            .from("closing_packages")
+            .select("id", { count: "exact", head: true })
+            .eq("is_active", true)
+            .eq("merauke_check_status", "PENDING")
+            .in("closings.status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"])
+            .lt("closings.finalized_at", meraukeCutoffIso),
+        ),
+        0,
+      ),
+    ]);
+
+    const [activeClosings, incomingTrend] = await Promise.all([
+      safe(this.fetchActiveClosings(), []),
+      safe(this.fetchIncomingTrend(trendFrom), []),
+    ]);
+
     return ok({
-      receivedToday: received.count ?? 0,
-      waitingClosing: waiting.count ?? 0,
-      readyToShip: ready.count ?? 0,
-      inTransit: transit.count ?? 0,
-      readyForPickup: pickup.count ?? 0,
-      outstandingIdr: (invoices.data ?? [])
-        .reduce((sum, row) => sum + Number(row.balance_idr), 0)
-        .toFixed(0),
+      summary: {
+        receivedToday,
+        waitingClosing,
+        waitingMerauke,
+        meraukeCompletedToday,
+        attentionCount: damaged + missing + hold,
+      },
+      attention: { damaged, missing, hold },
+      aging: {
+        waitingClosingOverThreshold: agingWaitingClosing,
+        waitingMeraukeOverThreshold: agingWaitingMerauke,
+      },
+      activeClosings,
+      incomingTrend,
+    });
+  }
+
+  private async fetchActiveClosings() {
+    const closings = db(
+      await this.client
+        .from("closings")
+        .select(
+          "*,closing_packages(merauke_check_status,is_active,customer_id_snapshot)",
+        )
+        .in("status", ["FINALIZED", "IN_SHIPMENT", "ARRIVED"])
+        .order("closing_date", { ascending: false })
+        .limit(5),
+    ) as Record<string, unknown>[];
+    return closings.map((closing) => {
+      const memberships = (closing.closing_packages ?? []) as {
+        merauke_check_status: string;
+        is_active: boolean;
+        customer_id_snapshot: string | null;
+      }[];
+      const active = memberships.filter((item) => item.is_active);
+      const checked = active.filter(
+        (item) => item.merauke_check_status !== "PENDING",
+      ).length;
+      return {
+        id: closing.id,
+        code: closing.code,
+        closingDate: closing.closing_date,
+        packageCount: active.length,
+        customerCount: new Set(
+          active.map((item) => item.customer_id_snapshot).filter(Boolean),
+        ).size,
+        checkedCount: checked,
+        pendingCount: active.length - checked,
+        progress: active.length ? Math.round((checked / active.length) * 100) : 0,
+      };
+    });
+  }
+
+  private async fetchIncomingTrend(from: string) {
+    const rows = db(
+      await this.client
+        .from("packages")
+        .select("received_date,count(*)")
+        .gte("received_date", from)
+        .order("received_date", { ascending: true }),
+    ) as { received_date: string; count: number | string }[];
+    const byDate = new Map(
+      rows.map((row) => [row.received_date, Number(row.count)]),
+    );
+    return Array.from({ length: 30 }, (_, index) => {
+      const date = jakartaDateDaysAgo(29 - index);
+      return { date, count: byDate.get(date) ?? 0 };
     });
   }
 
@@ -599,6 +775,8 @@ export class JastipinService {
         );
       }
       if (p.status) query = query.eq("status", p.status);
+      else if (p.attention === "true")
+        query = query.in("status", ["DAMAGED", "MISSING", "HOLD"]);
       else query = query.eq("status", "WAITING_CLOSING");
       if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
       if (p.dateTo) query = query.lte("received_date", p.dateTo);

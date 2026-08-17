@@ -15,7 +15,6 @@ import {
   PackagePlus,
   ReceiptText,
   Settings,
-  Ship,
   Users,
   X,
 } from "lucide-react";
@@ -30,7 +29,6 @@ const groups = [
       ["/incoming", "Barang Masuk", PackagePlus],
       ["/packages", "Semua Barang", Boxes],
       ["/closings", "Closing", Archive],
-      ["/shipments", "Pengiriman", Ship],
       ["/shipping-history", "History Pengiriman", History],
     ],
   },
@@ -61,7 +59,6 @@ const restricted: Record<string, string[]> = {
   ],
   STAFF_MERAUKE: [
     "/incoming",
-    "/shipments",
     "/rates",
     "/users",
     "/audit-log",

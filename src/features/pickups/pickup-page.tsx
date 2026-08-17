@@ -2,6 +2,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
 import { FormFieldsSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 type Customer = { id: string; code: string; name: string };
 type Pkg = {
@@ -12,10 +13,10 @@ type Pkg = {
 };
 
 export function PickupPage() {
+  const snackbar = useSnackbar();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [customer, setCustomer] = useState("");
-  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,10 +46,12 @@ export function PickupPage() {
         },
         { "Idempotency-Key": crypto.randomUUID() },
       );
-      setMessage("Pengambilan berhasil diselesaikan.");
+      snackbar.success("Pengambilan berhasil diselesaikan.");
       location.reload();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
 
@@ -119,7 +122,6 @@ export function PickupPage() {
           <button className="button">Selesaikan Pengambilan</button>
         </div>
       </form>
-      {message && <p>{message}</p>}
     </>
   );
 }

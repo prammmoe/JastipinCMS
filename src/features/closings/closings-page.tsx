@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate } from "@/lib/formatters";
 import { formatIdr } from "@/lib/formatters";
 import { statusTextClass } from "@/lib/status-text";
@@ -37,9 +38,9 @@ function monthOptions() {
 export function ClosingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const snackbar = useSnackbar();
   const [rows, setRows] = useState<ClosingRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [search, setSearch] = useState(() => searchParams.get("search") ?? "");
   const [month, setMonth] = useState(() => searchParams.get("month") ?? "");
 
@@ -53,15 +54,16 @@ export function ClosingsPage() {
       query.set("to", `${month}-${String(lastDay).padStart(2, "0")}`);
     }
     setLoading(true);
-    setError("");
     api
       .get<ClosingRow[]>(`/api/v1/closings?${query}`)
       .then(setRows)
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       )
       .finally(() => setLoading(false));
-  }, [search, month]);
+  }, [search, month, snackbar]);
 
   useEffect(() => {
     const timer = window.setTimeout(load, 180);
@@ -126,7 +128,6 @@ export function ClosingsPage() {
             </select>
           </div>
         </div>
-        {error && <div className="feedback error" style={{ margin: 16 }}>{error}</div>}
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>

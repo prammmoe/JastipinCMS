@@ -3,11 +3,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 export function EntityDetail({ section, id }: { section: string; id: string }) {
+  const snackbar = useSnackbar();
   const endpoint = section === "packages" ? "packages" : section;
   const [data, setData] = useState<Record<string, unknown>>();
-  const [message, setMessage] = useState("");
   const load = () =>
     api.get<Record<string, unknown>>(`/api/v1/${endpoint}/${id}`).then(setData);
   useEffect(() => {
@@ -16,10 +17,12 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
   async function action(name: string, body: unknown = {}) {
     try {
       await api.post(`/api/v1/${endpoint}/${id}/${name}`, body);
-      setMessage("Tindakan berhasil.");
+      snackbar.success("Tindakan berhasil.");
       load();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Tindakan gagal.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Tindakan gagal.",
+      );
     }
   }
   async function scan(event: FormEvent<HTMLFormElement>) {
@@ -79,11 +82,6 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
           </select>
           <button className="button">Scan</button>
         </form>
-      )}
-      {message && (
-        <div className="card" style={{ padding: 14, marginBottom: 14 }}>
-          {message}
-        </div>
       )}
       {!data ? (
         <DetailPageSkeleton />

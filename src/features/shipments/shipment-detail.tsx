@@ -1,8 +1,143 @@
 "use client";
 /* eslint-disable react-hooks/exhaustive-deps */
-import { FormEvent,useEffect,useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { statusTextClass } from "@/lib/status-text";
-type Closing={id:string;code:string;status:string};type Shipment={id:string;code:string;status:string;vessel_name?:string;shipment_closings:{closing_id:string;closings:Closing}[]};type Reconciliation={expected:number;checked:number;remaining:number};
-export function ShipmentDetail({id}:{id:string}){const [shipment,setShipment]=useState<Shipment>();const [closings,setClosings]=useState<Closing[]>([]);const [selected,setSelected]=useState<string[]>([]);const [recon,setRecon]=useState<Reconciliation>();const [message,setMessage]=useState("");const load=()=>Promise.all([api.get<Shipment>(`/api/v1/shipments/${id}`),api.get<Closing[]>("/api/v1/closings?pageSize=100&status=FINALIZED")]).then(([s,c])=>{setShipment(s);setClosings(c);if(["DEPARTED","ARRIVED","RECONCILED"].includes(s.status))api.get<Reconciliation>(`/api/v1/shipments/${id}/reconciliation`).then(setRecon)});useEffect(()=>{load()},[id]);async function action(name:string,body:unknown={}){try{await api.post(`/api/v1/shipments/${id}/${name}`,body);setMessage("Tindakan berhasil.");load()}catch(value){setMessage(value instanceof Error?value.message:"Tindakan gagal.")}}async function scan(event:FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget);await action("arrival-scan",{trackingNumber:form.get("trackingNumber"),condition:form.get("condition")});event.currentTarget.reset()}if(!shipment)return <DetailPageSkeleton/>;return <><div style={{display:"flex",justifyContent:"space-between",alignItems:"start"}}><div><h1>{shipment.code}</h1><p>{shipment.vessel_name??"Kapal belum diisi"} · <span className={statusTextClass(shipment.status)}>{shipment.status.replaceAll("_"," ")}</span></p></div>{["DRAFT","READY"].includes(shipment.status)&&<button className="button" onClick={()=>action("depart")}>Berangkatkan</button>}</div>{message&&<p>{message}</p>}{["DRAFT","READY"].includes(shipment.status)&&<div className="card" style={{padding:18,marginBottom:18}}><h3>Attach Closing</h3>{closings.filter(c=>!shipment.shipment_closings.some(sc=>sc.closing_id===c.id)).map(c=><label key={c.id} style={{display:"flex",gap:10,padding:8}}><input type="checkbox" onChange={e=>setSelected(e.target.checked?[...selected,c.id]:selected.filter(v=>v!==c.id))}/>{c.code}</label>)}<button className="button" disabled={!selected.length} onClick={()=>action("closings",{closingIds:selected})}>Tambahkan</button></div>}{["DEPARTED","ARRIVED"].includes(shipment.status)&&<form className="card" onSubmit={scan} style={{padding:18,display:"flex",gap:12,marginBottom:18}}><input className="input" name="trackingNumber" placeholder="Scan nomor resi" required autoFocus/><select className="input" name="condition" style={{maxWidth:180}}><option>OK</option><option>DAMAGED</option></select><button className="button">Scan</button></form>}{recon&&<div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:12,marginBottom:18}}>{[["Expected",recon.expected],["Checked",recon.checked],["Remaining",recon.remaining]].map(([label,value])=><div className="card" style={{padding:18}} key={String(label)}><span className="muted">{label}</span><strong style={{fontSize:26,display:"block"}}>{value}</strong></div>)}</div>}{shipment.status!=="RECONCILED"&&recon&&<button className="button" onClick={()=>action("reconcile",{confirmMissing:true})}>Finalisasi Rekonsiliasi</button>}<div className="card" style={{marginTop:18,padding:18}}><h3>Closing dalam shipment</h3>{shipment.shipment_closings.map(sc=><div key={sc.closing_id}>{sc.closings.code}</div>)}</div></>}
+
+type Closing = { id: string; code: string; status: string };
+type Shipment = {
+  id: string;
+  code: string;
+  status: string;
+  vessel_name?: string;
+  shipment_closings: { closing_id: string; closings: Closing }[];
+};
+type Reconciliation = { expected: number; checked: number; remaining: number };
+
+export function ShipmentDetail({ id }: { id: string }) {
+  const snackbar = useSnackbar();
+  const [shipment, setShipment] = useState<Shipment>();
+  const [closings, setClosings] = useState<Closing[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [recon, setRecon] = useState<Reconciliation>();
+  const load = () =>
+    Promise.all([
+      api.get<Shipment>(`/api/v1/shipments/${id}`),
+      api.get<Closing[]>("/api/v1/closings?pageSize=100&status=FINALIZED"),
+    ]).then(([s, c]) => {
+      setShipment(s);
+      setClosings(c);
+      if (["DEPARTED", "ARRIVED", "RECONCILED"].includes(s.status))
+        api
+          .get<Reconciliation>(`/api/v1/shipments/${id}/reconciliation`)
+          .then(setRecon);
+    });
+  useEffect(() => {
+    load();
+  }, [id]);
+  async function action(name: string, body: unknown = {}) {
+    try {
+      await api.post(`/api/v1/shipments/${id}/${name}`, body);
+      snackbar.success("Tindakan berhasil.");
+      load();
+    } catch (value) {
+      snackbar.error(
+        value instanceof Error ? value.message : "Tindakan gagal.",
+      );
+    }
+  }
+  async function scan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    await action("arrival-scan", {
+      trackingNumber: form.get("trackingNumber"),
+      condition: form.get("condition"),
+    });
+    event.currentTarget.reset();
+  }
+  if (!shipment) return <DetailPageSkeleton />;
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+        <div>
+          <h1>{shipment.code}</h1>
+          <p>{shipment.vessel_name ?? "Kapal belum diisi"} · <span className={statusTextClass(shipment.status)}>{shipment.status.replaceAll("_", " ")}</span></p>
+        </div>
+        {["DRAFT", "READY"].includes(shipment.status) && (
+          <button className="button" onClick={() => action("depart")}>
+            Berangkatkan
+          </button>
+        )}
+      </div>
+      {["DRAFT", "READY"].includes(shipment.status) && (
+        <div className="card" style={{ padding: 18, marginBottom: 18 }}>
+          <h3>Attach Closing</h3>
+          {closings
+            .filter(
+              (c) =>
+                !shipment.shipment_closings.some((sc) => sc.closing_id === c.id),
+            )
+            .map((c) => (
+              <label key={c.id} style={{ display: "flex", gap: 10, padding: 8 }}>
+                <input
+                  type="checkbox"
+                  onChange={(e) =>
+                    setSelected(
+                      e.target.checked
+                        ? [...selected, c.id]
+                        : selected.filter((v) => v !== c.id),
+                    )
+                  }
+                />
+                {c.code}
+              </label>
+            ))}
+          <button
+            className="button"
+            disabled={!selected.length}
+            onClick={() => action("closings", { closingIds: selected })}
+          >
+            Tambahkan
+          </button>
+        </div>
+      )}
+      {["DEPARTED", "ARRIVED"].includes(shipment.status) && (
+        <form
+          className="card"
+          onSubmit={scan}
+          style={{ padding: 18, display: "flex", gap: 12, marginBottom: 18 }}
+        >
+          <input className="input" name="trackingNumber" placeholder="Scan nomor resi" required autoFocus />
+          <select className="input" name="condition" style={{ maxWidth: 180 }}>
+            <option>OK</option>
+            <option>DAMAGED</option>
+          </select>
+          <button className="button">Scan</button>
+        </form>
+      )}
+      {recon && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginBottom: 18 }}>
+          {[["Expected", recon.expected], ["Checked", recon.checked], ["Remaining", recon.remaining]].map(([label, value]) => (
+            <div className="card" style={{ padding: 18 }} key={String(label)}>
+              <span className="muted">{label}</span>
+              <strong style={{ fontSize: 26, display: "block" }}>{value}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+      {shipment.status !== "RECONCILED" && recon && (
+        <button className="button" onClick={() => action("reconcile", { confirmMissing: true })}>
+          Finalisasi Rekonsiliasi
+        </button>
+      )}
+      <div className="card" style={{ marginTop: 18, padding: 18 }}>
+        <h3>Closing dalam shipment</h3>
+        {shipment.shipment_closings.map((sc) => (
+          <div key={sc.closing_id}>{sc.closings.code}</div>
+        ))}
+      </div>
+    </>
+  );
+}

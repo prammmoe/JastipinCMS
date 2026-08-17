@@ -7,6 +7,7 @@ import { CourierCombobox } from "@/components/ui/courier-combobox";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
 import { ImageUploader, ImageUploaderHandle } from "@/components/ui/image-uploader";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
@@ -38,11 +39,10 @@ const optionalNumber = (value: FormDataEntryValue | null) =>
   value === null || String(value).trim() === "" ? null : Number(value);
 
 export function PackageDetail({ id }: { id: string }) {
+  const snackbar = useSnackbar();
   const [pkg, setPkg] = useState<Pkg>();
   const [editing, setEditing] = useState(false);
   const [keepAttachmentIds, setKeepAttachmentIds] = useState<string[]>([]);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [duplicate, setDuplicate] = useState(false);
   const uploader = useRef<ImageUploaderHandle>(null);
@@ -55,15 +55,15 @@ export function PackageDetail({ id }: { id: string }) {
 
   useEffect(() => {
     load().catch((value) =>
-      setError(value instanceof Error ? value.message : "Gagal memuat paket."),
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal memuat paket.",
+      ),
     );
-  }, [load]);
+  }, [load, snackbar]);
 
   function startEdit() {
     if (!pkg) return;
     setKeepAttachmentIds(pkg.package_attachments.map((item) => item.id));
-    setMessage("");
-    setError("");
     setDuplicate(false);
     setEditing(true);
   }
@@ -71,7 +71,6 @@ export function PackageDetail({ id }: { id: string }) {
   function cancelEdit() {
     uploader.current?.clear();
     setEditing(false);
-    setError("");
     setDuplicate(false);
   }
 
@@ -81,7 +80,7 @@ export function PackageDetail({ id }: { id: string }) {
     const values = new FormData(event.currentTarget);
     const files = uploader.current?.getFiles() ?? [];
     if (keepAttachmentIds.length + files.length < 1) {
-      setError("Paket wajib menyisakan minimal satu foto.");
+      snackbar.error("Paket wajib menyisakan minimal satu foto.");
       return;
     }
     const payload = {
@@ -108,12 +107,11 @@ export function PackageDetail({ id }: { id: string }) {
     form.set("payload", JSON.stringify(payload));
     files.forEach((file) => form.append("file", file));
     setSaving(true);
-    setError("");
     try {
       await api.patch(`/api/v1/packages/${id}`, form);
       uploader.current?.clear();
       setEditing(false);
-      setMessage("Perubahan paket berhasil disimpan.");
+      snackbar.success("Perubahan paket berhasil disimpan.");
       await load();
     } catch (value) {
       if (
@@ -121,19 +119,20 @@ export function PackageDetail({ id }: { id: string }) {
         value.code === "PACKAGE_DUPLICATE_TRACKING"
       ) {
         setDuplicate(true);
-        setError("Nomor resi sudah ada. Isi alasan lalu simpan ulang untuk override.");
+        snackbar.error(
+          "Nomor resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
+        );
       } else {
-        setError(value instanceof Error ? value.message : "Gagal menyimpan paket.");
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal menyimpan paket.",
+        );
       }
     } finally {
       setSaving(false);
     }
   }
 
-  if (!pkg) {
-    if (error) return <p>{error}</p>;
-    return <DetailPageSkeleton />;
-  }
+  if (!pkg) return <DetailPageSkeleton />;
   const timeValue = pkg.received_time?.slice(0, 5) ?? "";
 
   return (
@@ -149,9 +148,6 @@ export function PackageDetail({ id }: { id: string }) {
           <button className="button" type="button" onClick={startEdit} style={{ minHeight: 44, padding: "10px 18px" }}><Pencil size={16} /> Edit</button>
         )}
       </div>
-      {error && <div className="feedback error">{error}</div>}
-      {message && <div className="feedback success">{message}</div>}
-
       {editing ? (
         <form className="card" onSubmit={save} style={{ padding: 20 }}>
           <div className="form-grid">

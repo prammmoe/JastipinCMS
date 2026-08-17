@@ -7,6 +7,7 @@ import { Plus, RefreshCcw, Search } from "lucide-react";
 import { api } from "@/lib/api-client/client";
 import { formatDateTime, formatIdr } from "@/lib/formatters";
 import { statusTextClass } from "@/lib/status-text";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
 
@@ -42,26 +43,25 @@ function value(row: Record<string, unknown>, key: string) {
 }
 export function ResourcePage({ config }: { config: ResourceConfig }) {
   const searchParams = useSearchParams();
+  const snackbar = useSnackbar();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(
     () => searchParams.get("search")?.trim() ?? "",
   );
   const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState("");
   const load = useCallback(
     () => {
       setLoading(true);
-      setError("");
       return api
         .get<Record<string, unknown>[]>(
           `${config.endpoint}${config.endpoint.includes("?") ? "&" : "?"}pageSize=50&search=${encodeURIComponent(search)}`,
         )
         .then(setRows)
-        .catch((e) => setError(e.message))
+        .catch((e) => snackbar.error(e.message))
         .finally(() => setLoading(false));
     },
-    [config.endpoint, search],
+    [config.endpoint, search, snackbar],
   );
   useEffect(() => {
     load();
@@ -73,9 +73,12 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
       await api.post(config.endpoint, data);
       event.currentTarget.reset();
       setShowForm(false);
+      snackbar.success("Data berhasil disimpan.");
       load();
     } catch (value) {
-      setError(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
   return (
@@ -180,11 +183,6 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
           </button>
           </div>
         </div>
-        {error && (
-          <div className="feedback error" style={{ margin: 16 }}>
-            {error}
-          </div>
-        )}
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>

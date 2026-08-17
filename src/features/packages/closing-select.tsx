@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { api } from "@/lib/api-client/client";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatReceivedDate } from "@/lib/formatters";
 
 type EligiblePackage = {
@@ -34,11 +35,11 @@ const toDateInput = (date: Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta" }).format(date);
 
 export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
+  const snackbar = useSnackbar();
   const router = useRouter();
   const [groups, setGroups] = useState<EligibleGroup[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [closingDate, setClosingDate] = useState(() => toDateInput(new Date()));
   const [notes, setNotes] = useState("");
@@ -53,7 +54,6 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
     if (dateFrom) query.set("dateFrom", dateFrom);
     if (dateTo) query.set("dateTo", dateTo);
     setLoading(true);
-    setError("");
     api
       .getPaged<EligibleGroup[]>(`/api/v1/packages/closing-eligible?${query}`)
       .then(({ data, meta }) => {
@@ -61,10 +61,12 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
         setTotal(meta?.total ?? 0);
       })
       .catch((value) =>
-        setError(value instanceof Error ? value.message : "Gagal memuat data."),
+        snackbar.error(
+          value instanceof Error ? value.message : "Gagal memuat data.",
+        ),
       )
       .finally(() => setLoading(false));
-  }, [search, dateFrom, dateTo]);
+  }, [search, dateFrom, dateTo, snackbar]);
 
   const customerKey = (group: EligibleGroup) =>
     group.customer?.id ?? "__none__";
@@ -101,7 +103,6 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
   async function save() {
     if (!selectedCount) return;
     setBusy(true);
-    setError("");
     try {
       const closingId = await api.post<string>("/api/v1/closings/save-surabaya", {
         closingDate,
@@ -110,7 +111,9 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
       });
       router.push(`/closings/${closingId}`);
     } catch (value) {
-      setError(value instanceof Error ? value.message : "Gagal menyimpan closing.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan closing.",
+      );
       setBusy(false);
     }
   }
@@ -141,8 +144,6 @@ export function ClosingSelect({ search, dateFrom, dateTo, onExit }: Props) {
           Batal
         </button>
       </div>
-
-      {error && <div className="feedback error" style={{ margin: 16 }}>{error}</div>}
 
       <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
         {loading ? (

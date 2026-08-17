@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api-client/client";
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatDate, formatIdr } from "@/lib/formatters";
 import { statusTextClass } from "@/lib/status-text";
 import type { Actor } from "@/types/domain";
@@ -54,13 +55,13 @@ const CONDITION_CLASS: Record<string, string> = {
 };
 
 export function ClosingDetail({ id }: { id: string }) {
+  const snackbar = useSnackbar();
   const [closing, setClosing] = useState<Closing>();
   const [user, setUser] = useState<Actor>();
   const [selected, setSelected] = useState<string[]>([]);
   const [condition, setCondition] = useState("OK");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string }>();
 
   const load = useCallback(
     () =>
@@ -91,22 +92,20 @@ export function ClosingDetail({ id }: { id: string }) {
   async function crosscheck() {
     if (!selected.length) return;
     setBusy(true);
-    setMessage(undefined);
     try {
       await api.post(`/api/v1/closings/${id}/merauke-check`, {
         packageIds: selected,
         condition,
         notes,
       });
-      setMessage({ kind: "ok", text: "Hasil cek Merauke tersimpan." });
+      snackbar.success("Hasil cek Merauke tersimpan.");
       setSelected([]);
       setNotes("");
       await load();
     } catch (value) {
-      setMessage({
-        kind: "error",
-        text: value instanceof Error ? value.message : "Gagal menyimpan.",
-      });
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     } finally {
       setBusy(false);
     }
@@ -116,16 +115,14 @@ export function ClosingDetail({ id }: { id: string }) {
     const reason = window.prompt("Alasan pembatalan:");
     if (reason === null) return;
     setBusy(true);
-    setMessage(undefined);
     try {
       await api.post(`/api/v1/closings/${id}/cancel`, { reason });
-      setMessage({ kind: "ok", text: "Closing dibatalkan." });
+      snackbar.success("Closing dibatalkan.");
       await load();
     } catch (value) {
-      setMessage({
-        kind: "error",
-        text: value instanceof Error ? value.message : "Gagal membatalkan.",
-      });
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal membatalkan.",
+      );
     } finally {
       setBusy(false);
     }
@@ -182,12 +179,6 @@ export function ClosingDetail({ id }: { id: string }) {
           )}
         </div>
       </div>
-
-      {message && (
-        <div className={`feedback ${message.kind}`} style={{ margin: "14px 0" }}>
-          {message.text}
-        </div>
-      )}
 
       {canCrosscheck && pendingPackages.length > 0 && (
         <div className="card" style={{ padding: 18, margin: "18px 0" }}>

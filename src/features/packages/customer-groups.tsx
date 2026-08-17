@@ -28,17 +28,14 @@ export type CustomerGroup = {
 export function CustomerGroups({
   groups,
   loading,
-  error,
 }: {
   groups: CustomerGroup[];
   loading: boolean;
-  error: string;
 }) {
   const [collapsed, setCollapsed] = useState<Record<number, boolean>>({});
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
-      {error && <div className="feedback error">{error}</div>}
       {loading ? (
         <div className="card" style={{ overflow: "hidden" }}>
           <div style={{ overflowX: "auto" }}>
