@@ -16,5 +16,4 @@ CREATE UNIQUE INDEX packages_unique_courier_tracking_customer_id ON public.packa
 -- Add comment documenting the constraint
 --
 COMMENT ON INDEX packages_unique_courier_tracking_customer_id IS
-'Unique constraint on (courier, tracking_number, customer_id) to prevent duplicate packages. ' ||
-'Duplicate check for customerName is handled at application level.';
+'Unique constraint on (courier, tracking_number, customer_id) to prevent duplicate packages. Duplicate check for customerName is handled at application level.';
