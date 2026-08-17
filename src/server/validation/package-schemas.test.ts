@@ -33,6 +33,20 @@ describe("packageIntakeSchema", () => {
   it("preserves a supplied reception time", () => {
     expect(packageIntakeSchema.parse({ ...validIntake, receivedTime: "14:35" }).receivedTime).toBe("14:35");
   });
+
+  it("accepts an optional customer phone number", () => {
+    expect(
+      packageIntakeSchema.parse({ ...validIntake, customerPhone: "0812 3456 7890" })
+        .customerPhone,
+    ).toBe("0812 3456 7890");
+    expect(packageIntakeSchema.parse(validIntake).customerPhone).toBeUndefined();
+  });
+
+  it("rejects a customer phone number longer than 30 characters", () => {
+    expect(() =>
+      packageIntakeSchema.parse({ ...validIntake, customerPhone: "1".repeat(31) }),
+    ).toThrow();
+  });
 });
 
 describe("packageListSchema", () => {

@@ -42,6 +42,12 @@ type Client = ReturnType<typeof createAdminClient>;
 const body = async (request: NextRequest) => request.json().catch(() => ({}));
 const clean = (value: string) => value.replace(/[%_,().]/g, "");
 const MAX_PACKAGE_PHOTOS = 2;
+const PACKAGE_LIST_STATUS_GROUPS: Record<string, string[]> = {
+  WAITING_CLOSING: ["WAITING_CLOSING"],
+  DAMAGED: ["DAMAGED"],
+  READY_TO_SHIP: ["READY_TO_SHIP"],
+  ARRIVED_MERAUKE: ["ARRIVED_MERAUKE"],
+};
 
 function packageReceivedAt(date: string, time?: string | null) {
   return new Date(`${date}T${time ?? "00:00"}:00+07:00`).toISOString();
@@ -516,6 +522,7 @@ export class JastipinService {
   private async resolveIncomingCustomer(
     customerId?: string | null,
     customerName?: string | null,
+    customerPhone?: string | null,
   ) {
     if (customerId) {
       const selected = await this.client
@@ -530,6 +537,13 @@ export class JastipinService {
         throw new AppError(
           "CUSTOMER_INACTIVE",
           "Customer yang dipilih sudah nonaktif.",
+        );
+      if (customerPhone)
+        db(
+          await this.client
+            .from("customers")
+            .update({ phone: customerPhone })
+            .eq("id", customerId),
         );
       return { id: String(selected.data.id), created: false };
     }
@@ -548,6 +562,13 @@ export class JastipinService {
           "CUSTOMER_INACTIVE",
           "Customer dengan nama ini sudah ada tetapi sedang nonaktif.",
         );
+      if (customerPhone)
+        db(
+          await this.client
+            .from("customers")
+            .update({ phone: customerPhone })
+            .eq("id", existing.data.id),
+        );
       return { id: String(existing.data.id), created: false };
     }
 
@@ -556,6 +577,7 @@ export class JastipinService {
       .insert({
         code: await code(this.client, "CUSTOMER", "CUS"),
         name: displayName,
+        phone: customerPhone,
       })
       .select("id,is_active")
       .single();
@@ -566,8 +588,16 @@ export class JastipinService {
         .eq("normalized_name", normalizedName)
         .maybeSingle();
       if (concurrent.error) mapDatabaseError(concurrent.error);
-      if (concurrent.data?.is_active)
+      if (concurrent.data?.is_active) {
+        if (customerPhone)
+          db(
+            await this.client
+              .from("customers")
+              .update({ phone: customerPhone })
+              .eq("id", concurrent.data.id),
+          );
         return { id: String(concurrent.data.id), created: false };
+      }
     }
     if (inserted.error) mapDatabaseError(inserted.error);
     return { id: String(inserted.data.id), created: true };
@@ -636,7 +666,7 @@ export class JastipinService {
       id &&
       ["hold", "release-hold"].includes(action ?? "")
     ) {
-      const status = action === "hold" ? "HOLD" : "WAITING_CLOSING";
+      const status = action === "hold" ? "WAITING_CLOSING" : "WAITING_CLOSING";
       return ok(
         await this.changePackageStatus(
           id,
@@ -652,17 +682,9 @@ export class JastipinService {
       );
       const from = (p.page - 1) * p.pageSize;
       const to = p.page * p.pageSize - 1;
-      const activeMemberships = db(
-        await this.client
-          .from("closing_packages")
-          .select("package_id")
-          .eq("is_active", true),
-      ) as { package_id: string }[];
-      const activeIds = activeMemberships.map((item) => item.package_id);
       let query = this.client
         .from("packages")
         .select("*,customers(id,code,name)", { count: "exact" });
-      if (activeIds.length) query = query.not("id", "in", `(${activeIds.join(",")})`);
       if (p.search) {
         const term = clean(p.search);
         const orTerms = `tracking_number.ilike.%${term}%,normalized_tracking_number.ilike.%${normalizeTrackingNumber(term)}%,package_code.ilike.%${term}%`;
@@ -677,10 +699,13 @@ export class JastipinService {
             : orTerms,
         );
       }
-      if (p.status) query = query.eq("status", p.status);
+      if (p.status)
+        query = query.in(
+          "status",
+          PACKAGE_LIST_STATUS_GROUPS[p.status] ?? [p.status],
+        );
       else if (p.attention === "true")
-        query = query.in("status", ["DAMAGED", "MISSING", "HOLD"]);
-      else query = query.eq("status", "WAITING_CLOSING");
+        query = query.in("status", ["DAMAGED", "WAITING_CLOSING"]);
       if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
       if (p.dateTo) query = query.lte("received_date", p.dateTo);
       if (p.customerId) query = query.eq("customer_id", p.customerId);
@@ -708,26 +733,35 @@ export class JastipinService {
       if (result.error) mapDatabaseError(result.error);
       return ok(result.data, pageMeta(p.page, p.pageSize, result.count ?? 0));
     }
-    if (method === "POST" && !id) {
+if (method === "POST" && !id) {
       const form = await request.formData();
       const raw = packagePayload(form);
       const input = packageIntakeSchema.parse(raw);
-      const files = await validatedPackageFiles(form, 1);
       const normalized = normalizeTrackingNumber(input.trackingNumber);
-      const duplicates = db(
-        await this.client
-          .from("packages")
-          .select("id,package_code,tracking_number,customer_id")
-          .eq("normalized_tracking_number", normalized),
-      ) as unknown[];
-      if (duplicates.length && !input.duplicateOverride)
+      const customerName = input.customerId
+        ? (await this.client.from("customers").select("name").eq("id", input.customerId).single()).data?.name
+        : input.customerName;
+      const { data: duplicates, error: duplicatesError } = (await this.client
+        .from("packages")
+        .select("id, customer_id")
+        .eq("courier", input.courier)
+        .eq("tracking_number", input.trackingNumber)) as {
+        data: { id: string; customer_id: string | null }[] | null;
+        error: unknown;
+      };
+      if (duplicatesError) throw duplicatesError;
+      const isDuplicate = customerName
+        ? (duplicates ?? []).some(
+            (p) =>
+              p.customer_id === input.customerId || (p.customer_id === null && !input.customerId),
+        )
+        : false;
+      if (isDuplicate)
         throw new AppError(
-          "PACKAGE_DUPLICATE_TRACKING",
-          "Nomor resi sudah tercatat.",
-          { matches: duplicates },
+          "PACKAGE_DUPLICATE",
+          "Nama/Kurir/Resi sudah terdaftar.",
         );
-      if (duplicates.length && !input.duplicateOverrideReason?.trim())
-        throw new AppError("VALIDATION_ERROR", "Alasan duplikat wajib diisi.");
+      const files = await validatedPackageFiles(form, 1);
       const pricing = calculatePackageCharge({
         actualWeightKg: input.actualWeightKg,
         lengthCm: input.lengthCm ?? undefined,
@@ -762,6 +796,7 @@ export class JastipinService {
         customer = await this.resolveIncomingCustomer(
           input.customerId,
           input.customerName,
+          input.customerPhone,
         );
       } catch (error) {
         await Promise.allSettled(
@@ -809,8 +844,6 @@ export class JastipinService {
           shipping_fee_idr: pricing.amountIdr,
           pricing_snapshot: pricing.pricingSnapshot,
           status: initialStatus,
-          duplicate_override: input.duplicateOverride,
-          duplicate_override_reason: input.duplicateOverrideReason,
           storage_location: input.storageLocation,
           notes: input.notes,
           created_by: actor.id,
@@ -854,14 +887,7 @@ export class JastipinService {
         to_status: initialStatus,
         actor_id: actor.id,
       });
-      await this.audit(
-        actor,
-        input.duplicateOverride
-          ? "PACKAGE_DUPLICATE_OVERRIDE"
-          : "PACKAGE_CREATED",
-        "PACKAGE",
-        data.id,
-      );
+      await this.audit(actor, "PACKAGE_CREATED", "PACKAGE", data.id);
       return ok(data, undefined, { status: 201 });
     }
     if (
@@ -869,7 +895,7 @@ export class JastipinService {
       id &&
       ["hold", "release-hold"].includes(action ?? "")
     ) {
-      const status = action === "hold" ? "HOLD" : "WAITING_CLOSING";
+      const status = action === "hold" ? "WAITING_CLOSING" : "WAITING_CLOSING";
       return ok(
         await this.changePackageStatus(
           id,
@@ -921,6 +947,31 @@ export class JastipinService {
       const form = await request.formData();
       const raw = packagePayload(form);
       const input = packageIntakeSchema.parse(raw);
+const normalized = normalizeTrackingNumber(input.trackingNumber);
+      const customerName = input.customerId
+        ? (await this.client.from("customers").select("name").eq("id", input.customerId).single()).data?.name
+        : input.customerName;
+      const { data: duplicates, error: duplicatesError } = (await this.client
+        .from("packages")
+        .select("id, customer_id")
+        .eq("courier", input.courier)
+        .eq("tracking_number", input.trackingNumber)) as {
+        data: { id: string; customer_id: string | null }[] | null;
+        error: unknown;
+      };
+      if (duplicatesError) throw duplicatesError;
+      const isDuplicate = customerName
+        ? (duplicates ?? []).some(
+            (p) =>
+              p.id !== current.id &&
+              (p.customer_id === input.customerId || (p.customer_id === null && !input.customerId)),
+        )
+        : false;
+      if (isDuplicate)
+        throw new AppError(
+          "PACKAGE_DUPLICATE",
+          "Nama/Kurir/Resi sudah terdaftar.",
+        );
       const files = await validatedPackageFiles(form, 0);
       const keepIds = Array.isArray(raw.keepAttachmentIds)
         ? raw.keepAttachmentIds.map((value) => uuid.parse(value))
@@ -938,25 +989,6 @@ export class JastipinService {
         throw new AppError("VALIDATION_ERROR", "Foto yang dipertahankan tidak valid.");
       if (keepIds.length + files.length < 1 || keepIds.length + files.length > 2)
         throw new AppError("VALIDATION_ERROR", "Paket wajib memiliki 1-2 foto.");
-
-      const normalized = normalizeTrackingNumber(input.trackingNumber);
-      const trackingChanged =
-        normalized !== String(current.normalized_tracking_number);
-      const duplicates = db(
-        await this.client
-          .from("packages")
-          .select("id")
-          .eq("normalized_tracking_number", normalized)
-          .neq("id", packageId),
-      ) as unknown[];
-      if (trackingChanged && duplicates.length && !input.duplicateOverride)
-        throw new AppError("PACKAGE_DUPLICATE_TRACKING", "Nomor resi sudah tercatat.");
-      if (
-        trackingChanged &&
-        duplicates.length &&
-        !input.duplicateOverrideReason?.trim()
-      )
-        throw new AppError("VALIDATION_ERROR", "Alasan duplikat wajib diisi.");
 
       const pricing = calculatePackageCharge({
         actualWeightKg: input.actualWeightKg,
@@ -991,6 +1023,7 @@ export class JastipinService {
         customer = await this.resolveIncomingCustomer(
           input.customerId,
           input.customerName,
+          input.customerPhone,
         );
       } catch (error) {
         await Promise.allSettled(
@@ -1050,12 +1083,6 @@ export class JastipinService {
           shipping_fee_idr: pricing.amountIdr,
           pricing_snapshot: pricing.pricingSnapshot,
           status,
-          duplicate_override: trackingChanged
-            ? input.duplicateOverride
-            : Boolean(current.duplicate_override),
-          duplicate_override_reason: trackingChanged
-            ? input.duplicateOverrideReason
-            : (current.duplicate_override_reason as string | null),
           notes: input.notes,
           updated_by: actor.id,
         })
@@ -1237,7 +1264,11 @@ export class JastipinService {
           : orTerms,
       );
     }
-    if (p.status) query = query.eq("status", p.status);
+    if (p.status)
+      query = query.in(
+        "status",
+        PACKAGE_LIST_STATUS_GROUPS[p.status] ?? [p.status],
+      );
     if (p.dateFrom) query = query.gte("received_date", p.dateFrom);
     if (p.dateTo) query = query.lte("received_date", p.dateTo);
     if (p.customerId) query = query.eq("customer_id", p.customerId);
@@ -1505,8 +1536,11 @@ export class JastipinService {
         query = query.gte("closing_date", request.nextUrl.searchParams.get("from")!);
       if (request.nextUrl.searchParams.get("to"))
         query = query.lte("closing_date", request.nextUrl.searchParams.get("to")!);
+const sort = p.sort ?? "closing_date:desc";
+      const [, sortOrder] = sort.split(":");
+      const ascending = sortOrder?.trim() === "asc";
       const result = await query
-        .order("closing_date", { ascending: false })
+        .order("closing_date", { ascending })
         .range(p.from, p.to);
       if (result.error) mapDatabaseError(result.error);
       const rows = (result.data ?? []).map((closing) => {

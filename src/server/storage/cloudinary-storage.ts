@@ -22,8 +22,7 @@ type CloudinaryUploadResponse = {
 function config(): CloudinaryConfig {
   const values = env();
   const cloudName =
-    values.CLOUDINARY_CLOUD_NAME ??
-    values.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    values.CLOUDINARY_CLOUD_NAME ?? values.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   if (!cloudName || !values.CLOUDINARY_API_KEY || !values.CLOUDINARY_API_SECRET)
     throw new AppError(
       "STORAGE_CONFIG_MISSING",
@@ -38,10 +37,7 @@ function config(): CloudinaryConfig {
   };
 }
 
-function signature(
-  params: Record<string, string>,
-  apiSecret: string,
-) {
+function signature(params: Record<string, string>, apiSecret: string) {
   const canonical = Object.entries(params)
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, value]) => `${key}=${value}`)
@@ -49,10 +45,7 @@ function signature(
   return createHash("sha1").update(`${canonical}${apiSecret}`).digest("hex");
 }
 
-export async function uploadCloudinaryImage(
-  file: File,
-  publicId: string,
-) {
+export async function uploadCloudinaryImage(file: File, publicId: string) {
   const values = config();
   const signed = {
     overwrite: "false",

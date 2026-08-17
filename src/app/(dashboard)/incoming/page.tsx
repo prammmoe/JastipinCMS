@@ -1,29 +1,36 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
 import { CourierCombobox } from "@/components/ui/courier-combobox";
 import {
   ImageUploader,
   type ImageUploaderHandle,
 } from "@/components/ui/image-uploader";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { useSnackbar } from "@/components/ui/snackbar";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
-import { ApiClientError } from "@/lib/api-client/errors";
+import { useSnackbar } from "@/components/ui/snackbar";
+import { formatDate, formatIdr } from "@/lib/formatters";
+import { packageStatusLabel } from "@/lib/package-status";
+import { statusTextClass } from "@/lib/status-text";
 
 export default function IncomingPage() {
   const snackbar = useSnackbar();
   const tracking = useRef<HTMLInputElement>(null);
   const imageUploaderRef = useRef<ImageUploaderHandle>(null);
   const [formResetSignal, setFormResetSignal] = useState(0);
-  const [duplicate, setDuplicate] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Jakarta",
   }).format(new Date());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIsSubmitting(true);
     const form = event.currentTarget;
     const data = new FormData(form);
 
@@ -45,14 +52,13 @@ export default function IncomingPage() {
       receivedTime: data.get("receivedTime") || null,
       receivingCondition,
       notes: data.get("catatan") || null,
-      duplicateOverride: duplicate,
-      duplicateOverrideReason: data.get("duplicateOverrideReason") || null,
     };
 
     try {
       const files = imageUploaderRef.current?.getFiles() ?? [];
       if (files.length === 0) {
         snackbar.error("Minimal satu foto bukti wajib diunggah.");
+        setIsSubmitting(false);
         return;
       }
       const requestForm = new FormData();
@@ -67,22 +73,13 @@ export default function IncomingPage() {
       form.reset();
       imageUploaderRef.current?.clear();
       setFormResetSignal((current) => current + 1);
-      setDuplicate(false);
       tracking.current?.focus();
     } catch (value) {
-      if (
-        value instanceof ApiClientError &&
-        value.code === "PACKAGE_DUPLICATE_TRACKING"
-      ) {
-        setDuplicate(true);
-        snackbar.error(
-          "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
-        );
-      } else {
-        snackbar.error(
-          value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
-        );
-      }
+      snackbar.error(
+        value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -92,7 +89,6 @@ export default function IncomingPage() {
         title="Barang Masuk"
         description="Dashboard untuk mencatat paket yang diterima."
       />
-
       <form className="card" onSubmit={submit} style={{ padding: 20 }}>
         <div className="form-grid" style={{ display: "grid", gap: 16 }}>
           <label>
@@ -152,65 +148,41 @@ export default function IncomingPage() {
             />
           </label>
           <label>
-            <span className="label">Panjang (cm)</span>
-            <input
-              className="input"
-              name="lengthCm"
-              type="number"
-              min="0.01"
-              step="0.01"
-            />
-          </label>
-          <label>
-            <span className="label">Lebar (cm)</span>
-            <input
-              className="input"
-              name="widthCm"
-              type="number"
-              min="0.01"
-              step="0.01"
-            />
-          </label>
-          <label>
-            <span className="label">Tinggi (cm)</span>
-            <input
-              className="input"
-              name="heightCm"
-              type="number"
-              min="0.01"
-              step="0.01"
-            />
+            <span className="label">Detail Paket</span>
+            <details
+              open={isExpanded}
+              onToggle={() => setIsExpanded(!isExpanded)}
+            >
+              <div style={{ display: "grid", gridTemplateColumns: "120px 80px 40px 90px", gap: "8px", padding: "8px 12px", background: "var(--background)", borderRadius: "8px", border: "1px solid var(--border)", marginTop: "8px" }}>
+                <div style={{ gridColumn: "1 / 3" }}>
+                  <span className="label">Panjang (cm)</span>
+                  <input className="input" name="lengthCm" type="number" min="0.01" step="0.01" />
+                </div>
+                <span style={{ gridColumn: "3", textAlign: "center" }}>cm</span>
+                <span style={{ gridColumn: "2 / 4", textAlign: "right" }}>
+                  <span className="label">Lebar (cm)</span>
+                  <input className="input" name="widthCm" type="number" min="0.01" step="0.01" />
+                </span>
+                <span style={{ gridColumn: "4", textAlign: "center" }}>cm</span>
+                <span className="label" style={{ gridColumn: "1 / 4" }}>Tinggi (cm)</span>
+                <input className="input" name="heightCm" type="number" min="0.01" step="0.01" />
+              </div>
+              <div style={{ marginTop: "8px", display: "grid", gridTemplateColumns: "1fr", gap: "8px", padding: "8px 12px", background: "var(--background)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <span className="label">Catatan</span>
+                <textarea className="input" name="catatan" placeholder="Catatan tambahan" rows={3} />
+              </div>
+            </details>
           </label>
         </div>
-        <label style={{ display: "block", marginTop: 16 }}>
-          <span className="label">Catatan</span>
-          <textarea
-            className="input"
-            name="catatan"
-            placeholder="Catatan tambahan"
-            rows={3}
-          />
-        </label>
-
-        {duplicate && (
-          <label style={{ display: "block", marginTop: 16 }}>
-            <span className="label">Alasan menyimpan resi duplikat *</span>
-            <input
-              className="input"
-              name="duplicateOverrideReason"
-              required
-              autoFocus
-            />
-          </label>
-        )}
-
         <div style={{ marginTop: 18 }}>
           <span className="label">Bukti foto * (total 1–2)</span>
           <ImageUploader ref={imageUploaderRef} maxFiles={2} />
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button className="button">Simpan &amp; Paket Berikutnya</button>
+          <button className="button" disabled={isSubmitting}>
+            {isSubmitting ? "Memproses..." : "Simpan & Paket Berikutnya"}
+          </button>
         </div>
       </form>
     </>

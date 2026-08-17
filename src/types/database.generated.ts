@@ -614,8 +614,6 @@ export type Database = {
           created_at: string;
           created_by: string;
           customer_id: string | null;
-          duplicate_override: boolean;
-          duplicate_override_reason: string | null;
           height_cm: number | null;
           id: string;
           length_cm: number | null;
@@ -644,8 +642,6 @@ export type Database = {
           created_at?: string;
           created_by: string;
           customer_id?: string | null;
-          duplicate_override?: boolean;
-          duplicate_override_reason?: string | null;
           height_cm?: number | null;
           id?: string;
           length_cm?: number | null;
@@ -674,8 +670,6 @@ export type Database = {
           created_at?: string;
           created_by?: string;
           customer_id?: string | null;
-          duplicate_override?: boolean;
-          duplicate_override_reason?: string | null;
           height_cm?: number | null;
           id?: string;
           length_cm?: number | null;

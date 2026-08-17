@@ -28,7 +28,7 @@ type SnackbarContextValue = {
 
 const SnackbarContext = createContext<SnackbarContextValue | null>(null);
 
-const AUTO_DISMISS_MS = 4200;
+const AUTO_DISMISS_MS = 10000;
 
 export function SnackbarProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<SnackbarItem[]>([]);

@@ -9,7 +9,6 @@ import { ImageUploader, ImageUploaderHandle } from "@/components/ui/image-upload
 import { DetailPageSkeleton } from "@/components/ui/skeleton";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { api } from "@/lib/api-client/client";
-import { ApiClientError } from "@/lib/api-client/errors";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
 import { packageStatusLabel } from "@/lib/package-status";
 import { statusTextClass } from "@/lib/status-text";
@@ -44,7 +43,6 @@ export function PackageDetail({ id }: { id: string }) {
   const [editing, setEditing] = useState(false);
   const [keepAttachmentIds, setKeepAttachmentIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
-  const [duplicate, setDuplicate] = useState(false);
   const uploader = useRef<ImageUploaderHandle>(null);
 
   const load = useCallback(async () => {
@@ -64,14 +62,12 @@ export function PackageDetail({ id }: { id: string }) {
   function startEdit() {
     if (!pkg) return;
     setKeepAttachmentIds(pkg.package_attachments.map((item) => item.id));
-    setDuplicate(false);
     setEditing(true);
   }
 
   function cancelEdit() {
     uploader.current?.clear();
     setEditing(false);
-    setDuplicate(false);
   }
 
   async function save(event: FormEvent<HTMLFormElement>) {
@@ -98,9 +94,6 @@ export function PackageDetail({ id }: { id: string }) {
       manualAmountIdr: Number(values.get("manualAmountIdr")),
       receivingCondition: String(values.get("receivingCondition")),
       notes: String(values.get("notes") ?? "") || null,
-      duplicateOverride: duplicate,
-      duplicateOverrideReason:
-        String(values.get("duplicateOverrideReason") ?? "") || null,
       keepAttachmentIds,
     };
     const form = new FormData();
@@ -114,19 +107,9 @@ export function PackageDetail({ id }: { id: string }) {
       snackbar.success("Perubahan paket berhasil disimpan.");
       await load();
     } catch (value) {
-      if (
-        value instanceof ApiClientError &&
-        value.code === "PACKAGE_DUPLICATE_TRACKING"
-      ) {
-        setDuplicate(true);
-        snackbar.error(
-          "Nomor resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
-        );
-      } else {
-        snackbar.error(
-          value instanceof Error ? value.message : "Gagal menyimpan paket.",
-        );
-      }
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan paket.",
+      );
     } finally {
       setSaving(false);
     }
@@ -164,12 +147,6 @@ export function PackageDetail({ id }: { id: string }) {
             <label><span className="label">Tinggi (cm)</span><input className="input" name="heightCm" type="number" min="0.01" step="0.01" defaultValue={pkg.height_cm ?? ""} /></label>
           </div>
           <label style={{ display: "block", marginTop: 16 }}><span className="label">Catatan</span><textarea className="input" name="notes" defaultValue={pkg.notes ?? ""} rows={3} /></label>
-          {duplicate && (
-            <label style={{ display: "block", marginTop: 16 }}>
-              <span className="label">Alasan override resi duplikat *</span>
-              <input className="input" name="duplicateOverrideReason" required />
-            </label>
-          )}
           <div style={{ marginTop: 18 }}>
             <span className="label">Bukti foto * (total 1–2)</span>
             <div className="package-photo-grid">

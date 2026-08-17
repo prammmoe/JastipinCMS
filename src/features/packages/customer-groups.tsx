@@ -5,7 +5,8 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
-import { packageReceivedClass, packageReceivedLabel } from "@/lib/package-status";
+import { packageListStatusLabel } from "@/lib/package-status";
+import { statusTextClass } from "@/lib/status-text";
 
 type GroupPackage = {
   id: string;
@@ -112,8 +113,8 @@ export function CustomerGroups({
                             <td>{row.package_code}</td>
                             <td>{row.tracking_number}</td>
                             <td>
-                              <span className={packageReceivedClass(row.status)}>
-                                {packageReceivedLabel(row.status)}
+                              <span className={statusTextClass(row.status)}>
+                                {packageListStatusLabel(row.status)}
                               </span>
                             </td>
                             <td>{formatIdr(row.shipping_fee_idr)}</td>

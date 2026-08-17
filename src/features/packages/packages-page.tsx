@@ -10,7 +10,11 @@ import { TableSkeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api-client/client";
 import { useSnackbar } from "@/components/ui/snackbar";
 import { formatIdr, formatReceivedDate } from "@/lib/formatters";
-import { packageReceivedClass, packageReceivedLabel } from "@/lib/package-status";
+import {
+  PACKAGE_LIST_STATUS_OPTIONS,
+  packageListStatusLabel,
+} from "@/lib/package-status";
+import { statusTextClass } from "@/lib/status-text";
 import { CustomerGroups, type CustomerGroup } from "./customer-groups";
 import { CustomerFilter } from "./customer-filter";
 import { ClosingSelect } from "./closing-select";
@@ -417,8 +421,11 @@ export function PackagesPage() {
                 }}
               >
                 <option value="">Semua status</option>
-                <option value="WAITING_CLOSING">Diterima</option>
-                <option value="DAMAGED">Diterima Rusak</option>
+                {PACKAGE_LIST_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label>
@@ -502,8 +509,8 @@ export function PackagesPage() {
                           <td>{row.tracking_number}</td>
                           <td>{row.customers?.name ?? "—"}</td>
                           <td>
-                            <span className={packageReceivedClass(row.status)}>
-                              {packageReceivedLabel(row.status)}
+                            <span className={statusTextClass(row.status)}>
+                              {packageListStatusLabel(row.status)}
                             </span>
                           </td>
                           <td>{formatIdr(row.shipping_fee_idr)}</td>

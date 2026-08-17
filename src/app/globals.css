@@ -307,19 +307,17 @@ select.input {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid #16a34a;
   border-radius: var(--radius-md);
-  background: var(--neutral-900);
-  color: var(--neutral-0);
+  background: #16a34a;
+  color: #ffffff;
   padding: 12px 14px;
   box-shadow: 0 12px 32px rgba(10, 10, 10, 0.22);
   pointer-events: auto;
   animation: snackbar-in 200ms var(--ease-out);
 }
-.snackbar-icon { display: flex; flex: 0 0 auto; align-items: center; color: var(--neutral-300); }
-.snackbar.success .snackbar-icon { color: #4ade80; }
-.snackbar.error .snackbar-icon { color: #f87171; }
-.snackbar.info .snackbar-icon { color: #93c5fd; }
+.snackbar-icon { display: flex; flex: 0 0 auto; align-items: center; color: rgba(255, 255, 255, 0.9); }
+.snackbar.error { background: #dc2626; border-color: #dc2626; }
 .snackbar-message { flex: 1; font-size: 13px; line-height: 1.45; word-break: break-word; }
 .snackbar-close {
   display: grid;
@@ -531,39 +529,6 @@ tbody tr { transition: background-color 120ms ease; }
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
-
-.snackbar {
-  position: fixed;
-  left: 50%;
-  bottom: 28px;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: min(420px, calc(100vw - 32px));
-  transform: translate(-50%, 16px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--neutral-0);
-  padding: 12px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.45;
-  box-shadow: 0 12px 32px rgba(10, 10, 10, 0.22);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease, transform 180ms var(--ease-out);
-}
-.snackbar[data-visible="true"] {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-}
-.snackbar[data-type="success"] { background: #1f8a4c; border-color: #1f8a4c; }
-.snackbar[data-type="info"] { background: #1d4ed8; border-color: #1d4ed8; }
-.snackbar[data-type="warning"] { background: #b45309; border-color: #b45309; }
-.snackbar[data-type="failed"] { background: #b91c1c; border-color: #b91c1c; }
-.snackbar svg { color: rgba(255, 255, 255, 0.9); }
 
 .modal-backdrop {
   position: fixed;

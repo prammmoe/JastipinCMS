@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { packageStatusLabel } from "./package-status";
+import {
+  PACKAGE_LIST_STATUS_OPTIONS,
+  packageListStatusLabel,
+  packageStatusLabel,
+} from "./package-status";
 
 describe("package status labels", () => {
   it("maps intake statuses to operational labels", () => {
@@ -12,5 +16,17 @@ describe("package status labels", () => {
     expect(packageStatusLabel("DAMAGED")).toBe("Rusak");
     expect(packageStatusLabel("MISSING")).toBe("Hilang");
     expect(packageStatusLabel("HOLD")).toBe("Ditahan");
+  });
+
+  it("groups the package list into four business statuses", () => {
+    expect(PACKAGE_LIST_STATUS_OPTIONS.map((option) => option.label)).toEqual([
+      "Diterima",
+      "Diterima Rusak",
+      "Closing Surabaya",
+      "Closing Merauke",
+    ]);
+    expect(packageListStatusLabel("WAITING_CLOSING")).toBe("Diterima");
+    expect(packageListStatusLabel("IN_TRANSIT")).toBe("Closing Surabaya");
+    expect(packageListStatusLabel("COMPLETED")).toBe("Closing Merauke");
   });
 });

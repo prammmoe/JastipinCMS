@@ -1,3 +1,9 @@
 import { ClosingDetail } from "@/features/closings/closing-detail";
-export default async function Page({params}:{params:Promise<{id:string}>}){const {id}=await params;return <ClosingDetail id={id}/>}
-
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return <ClosingDetail id={id} />;
+}
