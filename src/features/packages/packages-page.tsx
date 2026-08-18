@@ -113,6 +113,7 @@ export function PackagesPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [selecting, setSelecting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [user, setUser] = useState<Actor>();
 
   useEffect(() => {
@@ -218,6 +219,48 @@ export function PackagesPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
+  async function exportPdf() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set("dateFrom", dateFrom);
+      if (dateTo) params.set("dateTo", dateTo);
+      if (status) params.set("status", status);
+      if (customerId) params.set("customerId", customerId);
+      const response = await fetch(`/api/v1/packages/export-pdf?${params}`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) {
+        let message = "Gagal membuat PDF.";
+        try {
+          const payload = await response.json();
+          message = payload.error?.message ?? message;
+        } catch {
+          // non-JSON error body
+        }
+        throw new Error(message);
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("content-disposition");
+      const filename =
+        disposition?.match(/filename="?([^"]+)"?/i)?.[1] ?? "download.pdf";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (value) {
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal membuat PDF.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
   useEffect(() => {
     setPage(1);
   }, [
@@ -240,14 +283,26 @@ export function PackagesPage() {
         title="Semua Barang"
         description="Cari, filter, dan urutkan seluruh paket."
         actions={
-          user && (user.role === "ADMIN" || user.role === "STAFF_SIDOARJO") ? (
-            <button
-              className="button"
-              onClick={() => setSelecting((value) => !value)}
-            >
-              {selecting ? "Kembali ke daftar" : "Buat Closing"}
-            </button>
-          ) : undefined
+          <>
+            {user && (
+              <button
+                className="button secondary"
+                onClick={exportPdf}
+                disabled={exporting}
+              >
+                {exporting ? "Menyiapkan PDF..." : "Export Barang Diterima"}
+              </button>
+            )}
+            {user &&
+            (user.role === "ADMIN" || user.role === "STAFF_SIDOARJO") ? (
+              <button
+                className="button"
+                onClick={() => setSelecting((value) => !value)}
+              >
+                {selecting ? "Kembali ke daftar" : "Buat Closing"}
+              </button>
+            ) : undefined}
+          </>
         }
       />
       {selecting ? (

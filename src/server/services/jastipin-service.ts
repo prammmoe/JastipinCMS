@@ -18,6 +18,7 @@ import { updateInternalUser } from "@/server/services/update-internal-user";
 import { changePassword } from "@/server/services/change-password";
 import { exportClosingDocument } from "@/server/services/closing-export-service";
 import { exportPackagesCsv } from "@/server/services/package-export-service";
+import { exportReceivedPackagesPdf } from "@/server/services/received-report-service";
 import {
   cloudinaryDeliveryUrl,
   deleteCloudinaryImage,
@@ -154,6 +155,8 @@ export class JastipinService {
     if (resource === "rate-configs") return this.rates(request, method, id);
     if (resource === "packages" && id === "export")
       return exportPackagesCsv(request);
+    if (resource === "packages" && id === "export-pdf")
+      return exportReceivedPackagesPdf(request);
     if (resource === "packages" && id === "closing-eligible")
       return this.closingEligible(request);
     if (resource === "packages")
