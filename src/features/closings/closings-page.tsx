@@ -157,9 +157,7 @@ export function ClosingsPage() {
                       <td>{formatIdr(row.total_amount_idr)}</td>
                       <td>{row.merauke_progress}</td>
                       <td>
-                        <span
-                          className={closingStatusClass(row.status)}
-                        >
+                        <span className={closingStatusClass(row.status)}>
                           {closingStatusLabel(
                             row.status,
                             closingCheckedCount(row.merauke_progress),
@@ -184,7 +182,7 @@ export function ClosingsPage() {
                         className="muted"
                         style={{ textAlign: "center", padding: 30 }}
                       >
-                        Belum ada closing.
+                        Belum ada closing yang aktif.
                       </td>
                     </tr>
                   )}

@@ -1,4 +1,4 @@
-const SUCCESS = new Set(["READY_TO_SHIP", "ARRIVED_MERAUKE"]);
+const SUCCESS = new Set(["READY_TO_SHIP", "ARRIVED_MERAUKE", "COMPLETED"]);
 const WARNING = new Set(["DAMAGED"]);
 
 export function statusTextClass(status: string) {

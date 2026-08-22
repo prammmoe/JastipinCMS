@@ -1212,6 +1212,7 @@ const normalized = normalizeTrackingNumber(input.trackingNumber);
       if (existing) {
         existing.packages.push(row);
         existing.eligiblePackageIds.push(String(row.id));
+        existing.eligibleCount++;
       } else {
         groups.set(key, {
           customer,
