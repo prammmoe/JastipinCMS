@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
@@ -114,6 +114,9 @@ export function PackagesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [selecting, setSelecting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportFrom, setExportFrom] = useState("");
+  const [exportTo, setExportTo] = useState("");
   const [user, setUser] = useState<Actor>();
 
   useEffect(() => {
@@ -122,6 +125,22 @@ export function PackagesPage() {
       .then(setUser)
       .catch(() => {});
   }, []);
+
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showExportMenu) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(event.target as Node)
+      ) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showExportMenu]);
 
   const { dateFrom, dateTo } = useMemo(() => {
     if (month) return monthRange(month);
@@ -223,8 +242,8 @@ export function PackagesPage() {
     setExporting(true);
     try {
       const params = new URLSearchParams();
-      if (dateFrom) params.set("dateFrom", dateFrom);
-      if (dateTo) params.set("dateTo", dateTo);
+      if (exportFrom) params.set("dateFrom", exportFrom);
+      if (exportTo) params.set("dateTo", exportTo);
       if (status) params.set("status", status);
       if (customerId) params.set("customerId", customerId);
       const response = await fetch(`/api/v1/packages/export-pdf?${params}`, {
@@ -285,13 +304,123 @@ export function PackagesPage() {
         actions={
           <>
             {user && (
-              <button
-                className="button secondary"
-                onClick={exportPdf}
-                disabled={exporting}
-              >
-                {exporting ? "Menyiapkan PDF..." : "Export Barang Diterima"}
-              </button>
+              <div style={{ position: "relative" }} ref={exportMenuRef}>
+                <button
+                  className="button secondary"
+                  onClick={() => setShowExportMenu((v) => !v)}
+                  disabled={exporting}
+                >
+                  {exporting ? "Menyiapkan PDF..." : "Export Barang Diterima"}
+                </button>
+                {showExportMenu && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      right: 0,
+                      marginTop: 6,
+                      background: "var(--background)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: 14,
+                      minWidth: 260,
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      zIndex: 50,
+                    }}
+                  >
+                    <div style={{ marginBottom: 10 }}>
+                      <span
+                        className="label"
+                        style={{ marginBottom: 6, display: "block" }}
+                      >
+                        Cepat
+                      </span>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        {[
+                          { label: "Hari ini", preset: "today" as const },
+                          { label: "7 hari terakhir", preset: "7d" as const },
+                          { label: "30 hari terakhir", preset: "30d" as const },
+                        ].map((item) => (
+                          <button
+                            key={item.preset}
+                            className="button secondary"
+                            style={{ padding: "4px 10px", minHeight: 28, fontSize: 12 }}
+                            onClick={() => {
+                              const range = presetRange(item.preset);
+                              setExportFrom(range.dateFrom);
+                              setExportTo(range.dateTo);
+                            }}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <span
+                        className="label"
+                        style={{ marginBottom: 4, display: "block" }}
+                      >
+                        Atau pilih manual
+                      </span>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                        }}
+                      >
+                        <input
+                          className="input"
+                          type="date"
+                          value={exportFrom}
+                          onChange={(e) => setExportFrom(e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                        <span className="muted" style={{ fontSize: 12 }}>
+                          s/d
+                        </span>
+                        <input
+                          className="input"
+                          type="date"
+                          value={exportTo}
+                          onChange={(e) => setExportTo(e.target.value)}
+                          style={{ flex: 1 }}
+                        />
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <button
+                        className="button secondary"
+                        style={{ padding: "6px 12px", minHeight: 32 }}
+                        onClick={() => {
+                          setShowExportMenu(false);
+                          setExportFrom("");
+                          setExportTo("");
+                        }}
+                      >
+                        Batal
+                      </button>
+                      <button
+                        className="button"
+                        style={{ padding: "6px 12px", minHeight: 32 }}
+                        onClick={() => {
+                          setShowExportMenu(false);
+                          exportPdf();
+                        }}
+                      >
+                        Download PDF
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
             {user &&
             (user.role === "ADMIN" || user.role === "STAFF_SIDOARJO") ? (
