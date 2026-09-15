@@ -1,7 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- temporary compatibility layer while Supabase fluent calls are converted to SQL. */
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { d1, type SqlValue } from "@/server/d1/client";
-import { hashPassword } from "@/server/auth/passwords";
 
 type Result = { data: any; error: null | { message: string; code?: string }; count?: number | null };
 const identifier = (value: string) => { if (!/^[a-z_][a-z0-9_]*$/i.test(value)) throw new Error("Invalid SQL identifier"); return value; };
