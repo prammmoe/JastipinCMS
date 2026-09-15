@@ -3,6 +3,7 @@
 import { KeyboardEvent, useEffect, useId, useState } from "react";
 import { Check, UserPlus } from "lucide-react";
 import { api } from "@/lib/api-client/client";
+import { ComboboxOptionsSkeleton } from "@/components/ui/skeleton";
 
 type CustomerOption = {
   id: string;
@@ -10,11 +11,19 @@ type CustomerOption = {
   name: string;
 };
 
-export function CustomerCombobox() {
+export function CustomerCombobox({
+  required = false,
+  initialCustomer,
+}: {
+  required?: boolean;
+  initialCustomer?: CustomerOption | null;
+}) {
   const inputId = useId();
   const listboxId = useId();
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<CustomerOption | null>(null);
+  const [query, setQuery] = useState(initialCustomer?.name ?? "");
+  const [selected, setSelected] = useState<CustomerOption | null>(
+    initialCustomer ?? null,
+  );
   const [suggestions, setSuggestions] = useState<CustomerOption[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,15 +97,16 @@ export function CustomerCombobox() {
       }}
     >
       <label className="label" htmlFor={inputId}>
-        Customer
+        Customer{required ? " *" : ""}
       </label>
       <input
         id={inputId}
         className="input"
         name="customerName"
         value={query}
-        placeholder="Ketik nama customer"
+        placeholder="Kosongkan untuk NONAME"
         autoComplete="off"
+        required={required}
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listboxId}
@@ -123,7 +133,7 @@ export function CustomerCombobox() {
       {open && canSuggest && (
         <div className="combobox-menu" id={listboxId} role="listbox">
           {loading ? (
-            <div className="combobox-empty">Mencari customer...</div>
+            <ComboboxOptionsSkeleton />
           ) : suggestions.length ? (
             <>
               <div className="combobox-caption">Customer yang menyerupai</div>

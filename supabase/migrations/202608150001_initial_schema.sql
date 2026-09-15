@@ -159,7 +159,7 @@ create or replace function public.touch_updated_at() returns trigger language pl
 do $$ declare t text; begin foreach t in array array['profiles','customers','rate_configs','packages','closings','shipments','invoices','expenses'] loop execute format('create trigger %I_touch before update on public.%I for each row execute function public.touch_updated_at()', t, t); end loop; end $$;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('package-evidence','package-evidence',false,3145728,array['image/jpeg','image/png','image/webp'])
+values ('package-evidence','package-evidence',false,3145728,array['image/jpeg','image/png'])
 on conflict (id) do update set public = false, file_size_limit = excluded.file_size_limit, allowed_mime_types = excluded.allowed_mime_types;
 
 do $$ declare t text; begin foreach t in array array['profiles','business_counters','login_rate_limits','customers','rate_configs','packages','package_attachments','closings','closing_packages','shipments','shipment_closings','arrival_checks','invoices','invoice_items','payments','expenses','pickups','pickup_packages','package_status_history','audit_logs','system_settings'] loop execute format('alter table public.%I enable row level security', t); execute format('revoke all on table public.%I from anon, authenticated', t); end loop; end $$;

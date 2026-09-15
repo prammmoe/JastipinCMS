@@ -1,0 +1,16 @@
+name = "jastipin-cms"
+compatibility_date = "2026-09-15"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "jastipin-cms-staging"
+database_id = "79cdf032-1daa-48c2-8143-5a6979484bc5"
+preview_database_id = "jastipin-cms-staging-local"
+migrations_dir = "d1/migrations"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "jastipin-cms-production"
+database_id = "6ef60247-7e76-4c27-8353-f22448e214c9"
+preview_database_id = "jastipin-cms-production-local"
+migrations_dir = "d1/migrations"

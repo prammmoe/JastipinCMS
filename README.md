@@ -12,10 +12,10 @@ Browser hanya mengakses endpoint same-origin `/api/v1/*`. Seluruh Supabase Auth,
 2. Salin `.env.example` menjadi `.env.local`, lalu isi kredensial Supabase lokal.
 3. Jalankan `supabase start`, kemudian `supabase db reset`.
 4. Generate types dengan `pnpm db:types`.
-5. Buat Owner pertama:
+5. Buat Admin pertama:
 
    ```bash
-   OWNER_EMAIL=owner@example.com OWNER_PASSWORD='password-yang-kuat' OWNER_NAME='Owner' pnpm tsx scripts/bootstrap-owner.ts
+   ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='password-yang-kuat' ADMIN_NAME='Admin' pnpm tsx scripts/bootstrap-admin.ts
    ```
 
 6. Jalankan `pnpm dev` dan buka `http://localhost:3000`.

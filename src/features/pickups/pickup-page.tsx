@@ -1,6 +1,9 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { FormFieldsSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
+
 type Customer = { id: string; code: string; name: string };
 type Pkg = {
   id: string;
@@ -8,20 +11,26 @@ type Pkg = {
   tracking_number: string;
   customer_id: string;
 };
+
 export function PickupPage() {
+  const snackbar = useSnackbar();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [customer, setCustomer] = useState("");
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     Promise.all([
       api.get<Customer[]>("/api/v1/customers?pageSize=100"),
       api.get<Pkg[]>("/api/v1/packages?pageSize=100&status=READY_FOR_PICKUP"),
-    ]).then(([c, p]) => {
-      setCustomers(c);
-      setPackages(p);
-    });
+    ])
+      .then(([c, p]) => {
+        setCustomers(c);
+        setPackages(p);
+      })
+      .finally(() => setLoading(false));
   }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -37,13 +46,26 @@ export function PickupPage() {
         },
         { "Idempotency-Key": crypto.randomUUID() },
       );
-      setMessage("Pengambilan berhasil diselesaikan.");
+      snackbar.success("Pengambilan berhasil diselesaikan.");
       location.reload();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
+
   const available = packages.filter((p) => p.customer_id === customer);
+
+  if (loading) {
+    return (
+      <>
+        <h1>Pengambilan Paket</h1>
+        <FormFieldsSkeleton fields={4} />
+      </>
+    );
+  }
+
   return (
     <>
       <h1>Pengambilan Paket</h1>
@@ -100,7 +122,6 @@ export function PickupPage() {
           <button className="button">Selesaikan Pengambilan</button>
         </div>
       </form>
-      {message && <p>{message}</p>}
     </>
   );
 }

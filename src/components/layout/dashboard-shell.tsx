@@ -6,21 +6,15 @@ import { usePathname } from "next/navigation";
 import {
   Archive,
   Boxes,
-  ChartNoAxesCombined,
-  CircleHelp,
-  CreditCard,
-  HandCoins,
+  History,
   LayoutDashboard,
   LogOut,
   Menu,
   PackageCheck,
   PackagePlus,
   ReceiptText,
-  ScanLine,
   Settings,
-  Ship,
   Users,
-  WalletCards,
   X,
 } from "lucide-react";
 import { api } from "@/lib/api-client/client";
@@ -33,33 +27,14 @@ const groups = [
     items: [
       ["/incoming", "Barang Masuk", PackagePlus],
       ["/packages", "Semua Barang", Boxes],
-      ["/unidentified", "Belum Diketahui", CircleHelp],
       ["/closings", "Closing", Archive],
-      ["/shipments", "Pengiriman", Ship],
-      ["/arrivals", "Kedatangan", ScanLine],
-      ["/pickups", "Pengambilan", HandCoins],
+      ["/shipping-history", "History Pengiriman", History],
     ],
   },
   { label: "DATA", items: [["/customers", "Customer", Users]] },
   {
-    label: "KEUANGAN",
-    items: [
-      ["/invoices", "Tagihan", ReceiptText],
-      ["/payments", "Pembayaran", CreditCard],
-      ["/expenses", "Pengeluaran", WalletCards],
-    ],
-  },
-  {
-    label: "LAPORAN",
-    items: [
-      ["/reports-operational", "Operasional", ChartNoAxesCombined],
-      ["/reports-financial", "Keuangan", ChartNoAxesCombined],
-    ],
-  },
-  {
     label: "SYSTEM",
     items: [
-      ["/rates", "Tarif", Settings],
       ["/users", "Users", Users],
       ["/audit-log", "Audit Log", ReceiptText],
       ["/settings", "Settings", Settings],
@@ -68,33 +43,14 @@ const groups = [
 ] as const;
 
 const restricted: Record<string, string[]> = {
-  FINANCE: [
-    "/incoming",
-    "/unidentified",
-    "/closings",
-    "/shipments",
-    "/arrivals",
-    "/pickups",
-  ],
   STAFF_SIDOARJO: [
-    "/arrivals",
-    "/pickups",
-    "/payments",
-    "/expenses",
-    "/rates",
     "/users",
     "/audit-log",
-    "/settings",
   ],
   STAFF_MERAUKE: [
     "/incoming",
-    "/closings",
-    "/payments",
-    "/expenses",
-    "/rates",
     "/users",
     "/audit-log",
-    "/settings",
   ],
 };
 
@@ -107,7 +63,13 @@ function initials(name?: string) {
     .toUpperCase();
 }
 
-export function DashboardShell({ children }: { children: React.ReactNode }) {
+export function DashboardShell({
+  applicationName,
+  children,
+}: {
+  applicationName: string;
+  children: React.ReactNode;
+}) {
   const path = usePathname();
   const [user, setUser] = useState<Actor | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -132,7 +94,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <PackageCheck size={19} strokeWidth={1.8} />
           </span>
           <div>
-            <div className="brand-name">JASTIPin CMS</div>
+            <div className="brand-name">{applicationName}</div>
           </div>
           {mobileOpen && (
             <button

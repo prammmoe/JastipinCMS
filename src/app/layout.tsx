@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { getApplicationName } from "@/server/deployment";
+import { SnackbarProvider } from "@/components/ui/snackbar";
 import "./globals.css";
 
 const inter = localFont({
@@ -14,14 +16,20 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "JASTIPin CMS",
+  title: getApplicationName(),
   description: "Sistem informasi operasional internal JASTIPin",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="id" className={inter.variable}>
-      <body>{children}</body>
+      <body>
+        <SnackbarProvider>{children}</SnackbarProvider>
+      </body>
     </html>
   );
 }

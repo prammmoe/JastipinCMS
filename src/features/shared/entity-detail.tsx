@@ -2,11 +2,13 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 
 export function EntityDetail({ section, id }: { section: string; id: string }) {
+  const snackbar = useSnackbar();
   const endpoint = section === "packages" ? "packages" : section;
   const [data, setData] = useState<Record<string, unknown>>();
-  const [message, setMessage] = useState("");
   const load = () =>
     api.get<Record<string, unknown>>(`/api/v1/${endpoint}/${id}`).then(setData);
   useEffect(() => {
@@ -15,10 +17,12 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
   async function action(name: string, body: unknown = {}) {
     try {
       await api.post(`/api/v1/${endpoint}/${id}/${name}`, body);
-      setMessage("Tindakan berhasil.");
+      snackbar.success("Tindakan berhasil.");
       load();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Tindakan gagal.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Tindakan gagal.",
+      );
     }
   }
   async function scan(event: FormEvent<HTMLFormElement>) {
@@ -44,25 +48,6 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
           <p className="muted">ID: {id}</p>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {section === "closings" && (
-            <>
-              <button className="button" onClick={() => action("finalize")}>
-                Finalisasi
-              </button>
-              <a
-                className="button secondary"
-                href={`/api/v1/closings/${id}/export?format=xlsx`}
-              >
-                XLSX
-              </a>
-              <a
-                className="button secondary"
-                href={`/api/v1/closings/${id}/export?format=pdf`}
-              >
-                PDF
-              </a>
-            </>
-          )}
           {section === "shipments" && (
             <>
               <button className="button" onClick={() => action("depart")}>
@@ -98,16 +83,15 @@ export function EntityDetail({ section, id }: { section: string; id: string }) {
           <button className="button">Scan</button>
         </form>
       )}
-      {message && (
-        <div className="card" style={{ padding: 14, marginBottom: 14 }}>
-          {message}
+      {!data ? (
+        <DetailPageSkeleton />
+      ) : (
+        <div className="card" style={{ padding: 20, overflowX: "auto" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
+            {JSON.stringify(data, null, 2)}
+          </pre>
         </div>
       )}
-      <div className="card" style={{ padding: 20, overflowX: "auto" }}>
-        <pre style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>
-          {data ? JSON.stringify(data, null, 2) : "Memuat..."}
-        </pre>
-      </div>
     </>
   );
 }

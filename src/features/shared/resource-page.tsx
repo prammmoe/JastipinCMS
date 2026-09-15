@@ -1,11 +1,15 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Plus, RefreshCcw, Search } from "lucide-react";
 import { api } from "@/lib/api-client/client";
 import { formatDateTime, formatIdr } from "@/lib/formatters";
+import { statusTextClass } from "@/lib/status-text";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { PageHeader } from "@/components/ui/page-header";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 type Field = {
   name: string;
@@ -39,21 +43,25 @@ function value(row: Record<string, unknown>, key: string) {
 }
 export function ResourcePage({ config }: { config: ResourceConfig }) {
   const searchParams = useSearchParams();
+  const snackbar = useSnackbar();
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(
     () => searchParams.get("search")?.trim() ?? "",
   );
   const [showForm, setShowForm] = useState(false);
-  const [error, setError] = useState("");
   const load = useCallback(
-    () =>
-      api
+    () => {
+      setLoading(true);
+      return api
         .get<Record<string, unknown>[]>(
           `${config.endpoint}${config.endpoint.includes("?") ? "&" : "?"}pageSize=50&search=${encodeURIComponent(search)}`,
         )
         .then(setRows)
-        .catch((e) => setError(e.message)),
-    [config.endpoint, search],
+        .catch((e) => snackbar.error(e.message))
+        .finally(() => setLoading(false));
+    },
+    [config.endpoint, search, snackbar],
   );
   useEffect(() => {
     load();
@@ -65,9 +73,12 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
       await api.post(config.endpoint, data);
       event.currentTarget.reset();
       setShowForm(false);
+      snackbar.success("Data berhasil disimpan.");
       load();
     } catch (value) {
-      setError(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
   return (
@@ -172,11 +183,6 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
           </button>
           </div>
         </div>
-        {error && (
-          <div className="feedback error" style={{ margin: 16 }}>
-            {error}
-          </div>
-        )}
         <div style={{ overflowX: "auto" }}>
           <table>
             <thead>
@@ -188,42 +194,51 @@ export function ResourcePage({ config }: { config: ResourceConfig }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, index) => (
-                <tr key={String(row.id ?? index)}>
-                  {config.columns.map(([key]) => (
-                    <td key={key}>
-                      {key === "status" ? (
-                        <span className="badge">
-                          {value(row, key).replaceAll("_", " ")}
-                        </span>
-                      ) : (
-                        value(row, key)
+              {loading ? (
+                <TableSkeleton
+                  columns={config.columns.length}
+                  hasActionColumn={Boolean(config.detailBase)}
+                />
+              ) : (
+                <>
+                  {rows.map((row, index) => (
+                    <tr key={String(row.id ?? index)}>
+                      {config.columns.map(([key]) => (
+                        <td key={key}>
+                          {key === "status" ? (
+                            <span className={statusTextClass(value(row, key))}>
+                              {value(row, key).replaceAll("_", " ")}
+                            </span>
+                          ) : (
+                            value(row, key)
+                          )}
+                        </td>
+                      ))}
+                      {config.detailBase && (
+                        <td>
+                          <Link
+                            className="button secondary"
+                            href={`${config.detailBase}/${row.id}`}
+                            style={{ padding: "6px 10px" }}
+                          >
+                            Detail
+                          </Link>
+                        </td>
                       )}
-                    </td>
+                    </tr>
                   ))}
-                  {config.detailBase && (
-                    <td>
-                      <Link
-                        className="button secondary"
-                        href={`${config.detailBase}/${row.id}`}
-                        style={{ padding: "6px 10px" }}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={config.columns.length + (config.detailBase ? 1 : 0)}
+                        className="muted"
+                        style={{ textAlign: "center", padding: 30 }}
                       >
-                        Detail
-                      </Link>
-                    </td>
+                        Belum ada data.
+                      </td>
+                    </tr>
                   )}
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td
-                    colSpan={config.columns.length + 1}
-                    className="muted"
-                    style={{ textAlign: "center", padding: 30 }}
-                  >
-                    Belum ada data.
-                  </td>
-                </tr>
+                </>
               )}
             </tbody>
           </table>

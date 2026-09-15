@@ -1,6 +1,8 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "@/lib/api-client/client";
+import { FormFieldsSkeleton } from "@/components/ui/skeleton";
+import { useSnackbar } from "@/components/ui/snackbar";
 import { formatIdr } from "@/lib/formatters";
 type Invoice = {
   id: string;
@@ -8,16 +10,21 @@ type Invoice = {
   balance_idr: string;
   status: string;
 };
+
 export function PaymentPage() {
+  const snackbar = useSnackbar();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
   const load = () =>
     api
       .get<Invoice[]>("/api/v1/invoices?pageSize=100&status=UNPAID")
-      .then(setInvoices);
+      .then(setInvoices)
+      .finally(() => setLoading(false));
+
   useEffect(() => {
     load();
   }, []);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -33,13 +40,24 @@ export function PaymentPage() {
         },
         { "Idempotency-Key": crypto.randomUUID() },
       );
-      setMessage("Pembayaran berhasil dicatat.");
+      snackbar.success("Pembayaran berhasil dicatat.");
       event.currentTarget.reset();
       load();
     } catch (value) {
-      setMessage(value instanceof Error ? value.message : "Gagal menyimpan.");
+      snackbar.error(
+        value instanceof Error ? value.message : "Gagal menyimpan.",
+      );
     }
   }
+  if (loading) {
+    return (
+      <>
+        <h1>Pembayaran</h1>
+        <FormFieldsSkeleton fields={4} />
+      </>
+    );
+  }
+
   return (
     <>
       <h1>Pembayaran</h1>
@@ -90,7 +108,6 @@ export function PaymentPage() {
           <button className="button">Catat Pembayaran</button>
         </div>
       </form>
-      {message && <p>{message}</p>}
     </>
   );
 }

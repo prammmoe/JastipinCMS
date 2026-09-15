@@ -1,81 +1,91 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
-import { PackagePlus } from "lucide-react";
 import { CustomerCombobox } from "@/components/ui/customer-combobox";
+import { CourierCombobox } from "@/components/ui/courier-combobox";
+import {
+  ImageUploader,
+  type ImageUploaderHandle,
+} from "@/components/ui/image-uploader";
+import { useRef, useState, type FormEvent } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { api } from "@/lib/api-client/client";
 import { ApiClientError } from "@/lib/api-client/errors";
-
-type Option = {
-  id: string;
-  name: string;
-  code?: string;
-  rate_per_kg_idr?: string;
-};
+import { useSnackbar } from "@/components/ui/snackbar";
+import { normalizePhoneNumber } from "@/server/domain/customers/normalize-phone-number";
 
 export default function IncomingPage() {
+  const snackbar = useSnackbar();
   const tracking = useRef<HTMLInputElement>(null);
-  const [rates, setRates] = useState<Option[]>([]);
-  const [customerResetSignal, setCustomerResetSignal] = useState(0);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [duplicate, setDuplicate] = useState(false);
-
-  useEffect(() => {
-    api
-      .get<Option[]>("/api/v1/rate-configs?pageSize=100")
-      .then(setRates);
-  }, []);
+  const imageUploaderRef = useRef<ImageUploaderHandle>(null);
+  const [formResetSignal, setFormResetSignal] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+  }).format(new Date());
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setMessage("");
+    setIsSubmitting(true);
     const form = event.currentTarget;
     const data = new FormData(form);
+
+    const rawPhone = data.get("customerPhone")
+      ? String(data.get("customerPhone")).trim()
+      : "";
+    if (rawPhone && !normalizePhoneNumber(rawPhone)) {
+      snackbar.error("Nomor telepon harus diawali dengan 08 atau +62.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const harga = data.get("harga");
+    const receivingCondition =
+      data.get("receivingCondition") === "DAMAGED" ? "DAMAGED" : "RECEIVED";
     const payload = {
       trackingNumber: data.get("trackingNumber"),
       customerId: data.get("customerId") || null,
       customerName: data.get("customerName") || null,
+      customerPhone: rawPhone || null,
       courier: data.get("courier") || null,
       actualWeightKg: data.get("actualWeightKg") || null,
       lengthCm: data.get("lengthCm") || null,
       widthCm: data.get("widthCm") || null,
       heightCm: data.get("heightCm") || null,
-      chargeType: data.get("chargeType"),
-      rateConfigId: data.get("rateConfigId") || null,
-      manualAmountIdr: data.get("manualAmountIdr") || null,
-      duplicateOverride: duplicate,
-      duplicateOverrideReason: data.get("duplicateOverrideReason") || null,
-      overrideReason: data.get("overrideReason") || null,
-      notes: data.get("notes") || null,
+      chargeType: "FIXED" as const,
+      manualAmountIdr: harga ? Number(harga) : null,
+      receivedDate: data.get("receivedDate"),
+      receivedTime: data.get("receivedTime") || null,
+      receivingCondition,
+      notes: data.get("catatan") || null,
     };
 
     try {
-      const result = await api.post<{ package_code: string }>(
+      const files = imageUploaderRef.current?.getFiles() ?? [];
+      if (files.length === 0) {
+        snackbar.error("Minimal satu foto bukti wajib diunggah.");
+        setIsSubmitting(false);
+        return;
+      }
+      const requestForm = new FormData();
+      requestForm.set("payload", JSON.stringify(payload));
+      for (const file of files) requestForm.append("file", file);
+      const result = await api.post<{ id: string; package_code: string }>(
         "/api/v1/packages",
-        payload,
+        requestForm,
       );
-      setMessage(`${result.package_code} berhasil dicatat.`);
+
+      snackbar.success(`${result.package_code} berhasil dicatat.`);
       form.reset();
-      setCustomerResetSignal((current) => current + 1);
-      setDuplicate(false);
+      imageUploaderRef.current?.clear();
+      setFormResetSignal((current) => current + 1);
       tracking.current?.focus();
     } catch (value) {
-      if (
-        value instanceof ApiClientError &&
-        value.code === "PACKAGE_DUPLICATE_TRACKING"
-      ) {
-        setDuplicate(true);
-        setError(
-          "Resi sudah ada. Isi alasan lalu simpan ulang untuk override.",
-        );
-      } else {
-        setError(
-          value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
-        );
-      }
+      snackbar.error(
+        value instanceof ApiClientError ? value.message : "Gagal menyimpan.",
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -83,30 +93,10 @@ export default function IncomingPage() {
     <>
       <PageHeader
         title="Barang Masuk"
-        description="Catat paket berikutnya tanpa meninggalkan halaman ini. Input nomor resi tetap fokus untuk penggunaan scanner."
+        description="Dashboard untuk mencatat paket yang diterima."
       />
-
-      <form
-        className="card"
-        onSubmit={submit}
-        style={{ padding: 24, display: "grid", gap: 22 }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span className="brand-mark" style={{ width: 32, height: 32 }}>
-            <PackagePlus size={16} />
-          </span>
-          <div>
-            <h3 style={{ marginBottom: 2 }}>Informasi paket</h3>
-            <span className="muted" style={{ fontSize: 12 }}>
-              Nomor resi dan pemilik paket
-            </span>
-          </div>
-        </div>
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}
-        >
+      <form className="card" onSubmit={submit} style={{ padding: 20 }}>
+        <div className="form-grid" style={{ display: "grid", gap: 16 }}>
           <label>
             <span className="label">Nomor resi *</span>
             <input
@@ -118,87 +108,196 @@ export default function IncomingPage() {
               placeholder="Ketik lalu klik Enter"
             />
           </label>
+          <CustomerCombobox key={`customer-${formResetSignal}`} required />
           <label>
-            <span className="label">Kurir</span>
-            <input className="input" name="courier" placeholder="SPX, JNE, J&T" />
+            <span className="label">Nomor telepon customer</span>
+            <input
+              className="input"
+              name="customerPhone"
+              type="tel"
+              placeholder="Contoh: 081234567890 atau +6281234567890"
+            />
           </label>
-          <CustomerCombobox key={customerResetSignal} />
-        </div>
-
-        <div style={{ height: 1, background: "var(--border)" }} />
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16 }}
-        >
+          <CourierCombobox key={`courier-${formResetSignal}`} />
           <label>
-            <span className="label">Berat aktual (kg)</span>
-            <input className="input" name="actualWeightKg" type="number" step="0.001" min="0" />
-          </label>
-          {["lengthCm", "widthCm", "heightCm"].map((name, index) => (
-            <label key={name}>
-              <span className="label">
-                {["Panjang", "Lebar", "Tinggi"][index]} (cm)
-              </span>
-              <input className="input" name={name} type="number" step="0.01" min="0" />
-            </label>
-          ))}
-        </div>
-
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}
-        >
-          <label>
-            <span className="label">Jenis harga</span>
-            <select className="input" name="chargeType">
-              <option>WEIGHT</option>
-              <option>VOLUMETRIC</option>
-              <option>FIXED</option>
-              <option>MANUAL</option>
+            <span className="label">Status *</span>
+            <select className="input" name="receivingCondition" required>
+              <option value="RECEIVED">Diterima</option>
+              <option value="DAMAGED">Diterima Rusak</option>
             </select>
           </label>
           <label>
-            <span className="label">Tarif</span>
-            <select className="input" name="rateConfigId">
-              <option value="">Pilih bila berbasis berat</option>
-              {rates.map((rate) => (
-                <option key={rate.id} value={rate.id}>
-                  {rate.name}
-                </option>
-              ))}
-            </select>
+            <span className="label">Tanggal terima *</span>
+            <input
+              className="input"
+              name="receivedDate"
+              type="date"
+              defaultValue={today}
+              required
+            />
           </label>
           <label>
-            <span className="label">Nominal fixed/manual</span>
-            <input className="input" name="manualAmountIdr" type="number" min="0" />
+            <span className="label">Waktu terima</span>
+            <input className="input" name="receivedTime" type="time" />
+          </label>
+          <label>
+            <span className="label">Berat aktual (kg) *</span>
+            <input
+              className="input"
+              name="actualWeightKg"
+              type="number"
+              min="0.001"
+              step="0.001"
+              required
+            />
+          </label>
+          <label>
+            <span className="label">Harga *</span>
+            <input
+              className="input"
+              name="harga"
+              type="number"
+              min="1"
+              placeholder="Nominal harga"
+              required
+            />
           </label>
         </div>
 
-        <div
-          className="grid-responsive"
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}
-        >
-          <label>
-            <span className="label">Alasan harga manual</span>
-            <input className="input" name="overrideReason" />
-          </label>
-          <label>
-            <span className="label">Catatan</span>
-            <input className="input" name="notes" />
-          </label>
+        <div style={{ marginTop: 16 }}>
+          <details
+            open={isExpanded}
+            onToggle={(e) =>
+              setIsExpanded((e.target as HTMLDetailsElement).open)
+            }
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              background: "var(--surface-subtle)",
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "12px 16px",
+                fontWeight: 600,
+                fontSize: 13,
+                color: "var(--neutral-800)",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+            >
+              Detail Paket (Dimensi &amp; Catatan Opsional)
+            </summary>
+            <div
+              style={{
+                padding: "16px",
+                borderTop: "1px solid var(--border)",
+                background: "var(--surface)",
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              <div>
+                <span
+                  className="label"
+                  style={{ marginBottom: 8, color: "var(--neutral-600)" }}
+                >
+                  Dimensi Paket (P × L × T dalam cm)
+                </span>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Panjang (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="lengthCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Lebar (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="widthCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    <span className="label" style={{ fontWeight: 500 }}>
+                      Tinggi (cm)
+                    </span>
+                    <input
+                      className="input"
+                      name="heightCm"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <label
+                style={{ display: "flex", flexDirection: "column", gap: 6 }}
+              >
+                <span className="label">Catatan</span>
+                <textarea
+                  className="input"
+                  name="catatan"
+                  placeholder="Catatan tambahan paket (opsional)"
+                  rows={3}
+                  style={{ resize: "vertical", minHeight: 70 }}
+                />
+              </label>
+            </div>
+          </details>
+        </div>
+        <div style={{ marginTop: 18 }}>
+          <span className="label">Bukti foto * (total 1–2)</span>
+          <ImageUploader ref={imageUploaderRef} maxFiles={2} />
         </div>
 
-        {duplicate && (
-          <label>
-            <span className="label">Alasan menyimpan resi duplikat *</span>
-            <input className="input" name="duplicateOverrideReason" required autoFocus />
-          </label>
-        )}
-        {error && <div className="feedback error">{error}</div>}
-        {message && <div className="feedback">{message}</div>}
-        <div>
-          <button className="button">Simpan &amp; Paket Berikutnya</button>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+          <button className="button" disabled={isSubmitting}>
+            {isSubmitting ? "Memproses..." : "Simpan & Paket Berikutnya"}
+          </button>
         </div>
       </form>
     </>
