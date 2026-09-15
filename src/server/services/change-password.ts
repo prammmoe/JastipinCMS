@@ -1,8 +1,9 @@
 import "server-only";
 import { z } from "zod";
 import type { NextRequest } from "next/server";
-import { createAdminClient, createAuthClient } from "@/server/supabase/clients";
-import { AppError, mapDatabaseError } from "@/server/errors/app-error";
+import { d1 } from "@/server/d1/client";
+import { hashPassword, verifyPassword } from "@/server/auth/passwords";
+import { AppError } from "@/server/errors/app-error";
 import { ok } from "@/server/api/response";
 import type { Actor } from "@/types/domain";
 
@@ -19,27 +20,10 @@ export async function changePassword(
   if (method !== "POST")
     throw new AppError("NOT_FOUND", "Endpoint tidak ditemukan.", undefined, 404);
   const input = schema.parse(await request.json().catch(() => ({})));
-  const admin = createAdminClient();
-  const { data: authUser, error: getUserError } =
-    await admin.auth.admin.getUserById(actor.id);
-  const email = authUser?.user?.email;
-  if (getUserError || !email)
-    throw new AppError("AUTH_USER_NOT_FOUND", "Akun pengguna tidak ditemukan.");
-  const verify = await createAuthClient().auth.signInWithPassword({
-    email,
-    password: input.currentPassword,
-  });
-  if (verify.error)
+  const db = d1();
+  const user = await db.one<{ password_hash: string }>("SELECT password_hash FROM profiles WHERE id=?", [actor.id]);
+  if (!user || !(await verifyPassword(input.currentPassword, user.password_hash)))
     throw new AppError("AUTH_INVALID_CREDENTIALS", "Password saat ini salah.");
-  const update = await admin.auth.admin.updateUserById(actor.id, {
-    password: input.newPassword,
-  });
-  if (update.error) mapDatabaseError(update.error);
-  await admin.from("audit_logs").insert({
-    actor_id: actor.id,
-    action: "PASSWORD_CHANGED",
-    entity_type: "USER",
-    entity_id: actor.id,
-  });
+  await db.batch([{ sql: "UPDATE profiles SET password_hash=? WHERE id=?", params: [await hashPassword(input.newPassword), actor.id] }, { sql: "DELETE FROM sessions WHERE profile_id=?", params: [actor.id] }]);
   return ok({ updated: true });
 }

@@ -2,14 +2,14 @@
 
 ## Environment map
 
-| Target | Git branch | Supabase | Vercel | URL |
+| Target | Git branch | D1 database ID | Vercel | URL |
 | --- | --- | --- | --- | --- |
-| Staging | `staging` | `rwcrzhfvpgzvqdedpfwp` (Tokyo) | Preview | `https://jastipin-cms-staging.vercel.app` |
-| Production | `main` | `uobltqmvlatdvaxpgerd` (Singapore) | Production | `https://jastipin-cms.vercel.app` |
+| Staging | `staging` | `79cdf032-1daa-48c2-8143-5a6979484bc5` | Preview | `https://jastipin-cms-staging.vercel.app` |
+| Production | `main` | `6ef60247-7e76-4c27-8353-f22448e214c9` | Production | `https://jastipin-cms.vercel.app` |
 
-Browser tetap hanya berkomunikasi dengan `/api/v1/*`. Setiap deployment menggunakan Supabase URL dan secret backend milik environment-nya sendiri.
+Browser tetap hanya berkomunikasi dengan `/api/v1/*`. Vercel Preview memakai D1 staging, sedangkan Vercel Production memakai D1 production.
 
-Tooling deployment dipin ke Supabase CLI `2.40.7`, Vercel CLI `59.1.3`, Node.js 22, dan pnpm 11.19.0.
+Tooling deployment memakai Wrangler, Vercel CLI `59.1.3`, Node.js 22, dan pnpm 11.19.0.
 
 Resource Vercel yang sudah dibuat:
 
@@ -18,7 +18,7 @@ Resource Vercel yang sudah dibuat:
 - Organization ID: `team_vwdfHfQRxO3Wl9YNhOhengoA`
 - Project ID: `prj_rhbZYFoNF4ysu6rId120EY1aeEgR`
 
-Checkout lokal sengaja ditautkan ke Supabase staging agar perintah `supabase` saat development tidak menyentuh production secara tidak sengaja.
+Checkout lokal memakai binding Wrangler `staging` dan database D1 lokal; migration remote staging/production harus selalu dipanggil secara eksplisit.
 
 ## GitHub Environments
 
