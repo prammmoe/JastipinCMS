@@ -1,4 +1,3 @@
-import "server-only";
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 
 const options = { N: 32_768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };

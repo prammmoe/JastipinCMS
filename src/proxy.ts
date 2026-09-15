@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/login")) return NextResponse.next();
 
-  const cookieName = process.env.AUTH_ACCESS_COOKIE_NAME ?? "jastipin_access";
+  const cookieName = process.env.AUTH_SESSION_COOKIE_NAME ?? "jastipin_session";
 
   if (!request.cookies.has(cookieName)) {
     const url = request.nextUrl.clone();
