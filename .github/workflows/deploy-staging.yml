@@ -64,7 +64,7 @@ jobs:
             local name="$1"
             local value="$2"
             pnpm dlx vercel@59.1.3 env rm "$name" preview --yes --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN" || true
-            printf '%s' "$value" | pnpm dlx vercel@59.1.3 env add "$name" preview --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
+            printf '%s' "$value" | pnpm dlx vercel@59.1.3 env add "$name" preview --yes --scope="$VERCEL_SCOPE" --token="$VERCEL_TOKEN"
           }
           sync_secret APP_URL "$APP_URL"
           sync_secret CLOUDFLARE_ACCOUNT_ID "$CLOUDFLARE_ACCOUNT_ID"
