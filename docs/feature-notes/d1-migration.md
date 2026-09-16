@@ -17,7 +17,6 @@ Branch: `staging`
 - Added separate Wrangler D1 bindings and migration commands for staging and production.
 - Updated deployment workflows to apply the matching D1 migration using the environment-scoped Cloudflare token.
 - Deployment now synchronizes the four server runtime values from GitHub Environment secrets to the matching Vercel target before its build.
-- Made Vercel environment synchronization fully non-interactive, including the Preview branch scope prompt.
 
 ### Bugs And Fixes
 - The existing Supabase query surface is broad; a transitional D1 query adapter was introduced so API route contracts can remain stable while SQL paths are migrated.
