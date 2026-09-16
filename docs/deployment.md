@@ -64,6 +64,34 @@ Variabel tersebut sudah dipasang pada project Vercel. Saat memasukkannya ulang m
 
 Migrasi harus forward-compatible. Untuk perubahan destruktif, gunakan pola expand–migrate–contract dalam beberapa rilis.
 
+## Scheduled database health check
+
+Migration `202609160001_maintenance_health_check.sql` mengaktifkan `pg_cron` dan
+mendaftarkan job `maintenance-health-check`. Job tersebut menjalankan `select now()`
+pada 00:00, 08:00, dan 16:00 UTC tanpa mengubah tabel aplikasi, data bisnis, atau
+Storage. Deploy ke `staging` dan `main` sudah menjalankan migration Supabase secara
+otomatis ke database masing-masing.
+
+Periksa konfigurasi dan hasilnya di Supabase SQL Editor:
+
+```sql
+select jobid, jobname, schedule, command, active
+from cron.job
+where jobname = 'maintenance-health-check';
+
+select status, return_message, start_time, end_time
+from cron.job_run_details
+where jobid = (
+  select jobid from cron.job where jobname = 'maintenance-health-check'
+)
+order by start_time desc
+limit 10;
+```
+
+Supabase Free menentukan pause berdasarkan kecukupan aktivitas database pengguna;
+job internal ini adalah mitigasi dan bukan jaminan bahwa project tidak akan dipause.
+Job juga tidak dapat berjalan atau memulihkan project setelah project dipause.
+
 ## Initial admin
 
 Bootstrap Admin dilakukan terpisah untuk setiap environment. Akun `OWNER` lama dimigrasikan menjadi `ADMIN`. Untuk environment baru, muat seluruh variabel Supabase dan Admin target, lalu jalankan script tanpa menyimpan password ke Git:
