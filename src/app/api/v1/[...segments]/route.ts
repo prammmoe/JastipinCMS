@@ -81,8 +81,9 @@ async function handle(request: NextRequest, context: RouteContext) {
       );
       const response = ok({ user: result.profile });
       new SessionService().attachCookies(response, {
-        token: result.session.token,
-        expiresIn: result.session.expiresIn,
+        accessToken: result.session.access_token,
+        refreshToken: result.session.refresh_token,
+        expiresIn: result.session.expires_in,
       });
       response.headers.set("cache-control", "private, no-store");
       return response;

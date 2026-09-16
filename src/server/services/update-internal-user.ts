@@ -1,7 +1,7 @@
 import "server-only";
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { createAdminClient } from "@/server/database/clients";
+import { createAdminClient } from "@/server/supabase/clients";
 import { ok } from "@/server/api/response";
 import { AppError, mapDatabaseError } from "@/server/errors/app-error";
 import type { Actor } from "@/types/domain";
