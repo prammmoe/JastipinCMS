@@ -21,5 +21,3 @@ Branch: `staging`
 
 ### Bugs And Fixes
 - The existing Supabase query surface is broad; a transitional D1 query adapter was introduced so API route contracts can remain stable while SQL paths are migrated.
-- Bug: The navigation proxy still checked the retired Supabase access-cookie name after login.
-  Fix: Check the D1 session cookie so a successful login reaches the dashboard.

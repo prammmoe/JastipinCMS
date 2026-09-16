@@ -1,3 +1,4 @@
+import "server-only";
 import { env } from "@/server/env";
 
 export type SqlValue = string | number | boolean | null | undefined | SqlValue[];
