@@ -2,6 +2,15 @@
 
 Branch: `staging`
 
+## 2026-09-16 - Scheduled database health check
+
+### Changed
+- Added an idempotent Supabase `pg_cron` migration that runs `select now()` at 00:00, 08:00, and 16:00 UTC under the `maintenance-health-check` job name.
+- Documented deployment, job inspection, and run-history queries for staging and production.
+
+### Stayed The Same
+- No application code, business data, API route, Storage configuration, or deployment workflow changed; the existing migration step applies the job per environment.
+
 ## 2026-08-16 - Default unnamed packages to NONAME
 
 ### Changed
