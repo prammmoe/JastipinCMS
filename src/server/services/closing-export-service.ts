@@ -1,7 +1,7 @@
 import "server-only";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
-import { createAdminClient } from "@/server/database/clients";
+import { createAdminClient } from "@/server/supabase/clients";
 import { AppError, mapDatabaseError } from "@/server/errors/app-error";
 import { prepareClosingExportData } from "@/features/closings/export/closing-export.mapper";
 import { prepareClosingExportLayout } from "@/features/closings/export/closing-export-grouping";

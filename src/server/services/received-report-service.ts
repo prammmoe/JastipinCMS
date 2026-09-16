@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck -- transitional query adapter keeps the existing API contract during D1 migration.
 import "server-only";
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/server/database/clients";
+import { createAdminClient } from "@/server/supabase/clients";
 import { mapDatabaseError } from "@/server/errors/app-error";
 import { indonesianDecimal } from "@/features/closings/export/closing-export.mapper";
 import {

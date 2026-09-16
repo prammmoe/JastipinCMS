@@ -17,10 +17,11 @@ jobs:
     timeout-minutes: 15
     env:
       APP_URL: http://localhost:3000
-      CLOUDFLARE_ACCOUNT_ID: ci-account
-      CLOUDFLARE_D1_DATABASE_ID: 79cdf032-1daa-48c2-8143-5a6979484bc5
-      CLOUDFLARE_D1_API_TOKEN: ci-token
-      AUTH_SESSION_COOKIE_NAME: jastipin_session
+      SUPABASE_URL: https://example.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: ci-publishable-key
+      SUPABASE_SECRET_KEY: ci-secret-key
+      AUTH_ACCESS_COOKIE_NAME: jastipin_access
+      AUTH_REFRESH_COOKIE_NAME: jastipin_refresh
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

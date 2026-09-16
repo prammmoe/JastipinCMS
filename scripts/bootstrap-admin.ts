@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
-import { d1 } from "../src/server/d1/client";
-import { hashPassword } from "../src/server/auth/passwords";
+import { createClient } from "@supabase/supabase-js";
 
 async function main() {
   const required = [
+    "SUPABASE_URL",
+    "SUPABASE_SECRET_KEY",
     "ADMIN_EMAIL",
     "ADMIN_PASSWORD",
     "ADMIN_NAME",
@@ -11,11 +11,29 @@ async function main() {
   for (const key of required) {
     if (!process.env[key]) throw new Error(`Missing ${key}`);
   }
-  await d1().execute(
-    "INSERT INTO profiles(id,email,password_hash,name,role) VALUES(?,?,?,?,?) ON CONFLICT(email) DO NOTHING",
-    [randomUUID(), process.env.ADMIN_EMAIL!.trim().toLowerCase(), await hashPassword(process.env.ADMIN_PASSWORD!), process.env.ADMIN_NAME!, "ADMIN"],
+  const client = createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } },
   );
-  console.log(`Admin ensured: ${process.env.ADMIN_EMAIL}`);
+  const result = await client.auth.admin.createUser({
+    email: process.env.ADMIN_EMAIL!,
+    password: process.env.ADMIN_PASSWORD!,
+    email_confirm: true,
+  });
+  if (result.error || !result.data.user) {
+    throw result.error ?? new Error("Supabase Auth tidak mengembalikan user.");
+  }
+  const profile = await client.from("profiles").insert({
+    id: result.data.user.id,
+    name: process.env.ADMIN_NAME!,
+    role: "ADMIN",
+  });
+  if (profile.error) {
+    await client.auth.admin.deleteUser(result.data.user.id);
+    throw profile.error;
+  }
+  console.log(`Admin created: ${result.data.user.id}`);
 }
 
 main().catch((error: unknown) => {
